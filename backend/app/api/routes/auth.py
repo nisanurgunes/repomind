@@ -1,0 +1,91 @@
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.core.config import settings
+from app.core.database import get_db
+from app.models.user import User
+from app.models.repo import Watchlist
+import httpx
+import jwt
+import datetime
+
+router = APIRouter()
+
+GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize"
+GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
+GITHUB_USER_URL = "https://api.github.com/user"
+
+@router.get("/login")
+async def github_login():
+    github_url = (
+        f"{GITHUB_AUTH_URL}"
+        f"?client_id={settings.GITHUB_CLIENT_ID}"
+        f"&scope=read:user,user:email"
+    )
+    return RedirectResponse(url=github_url)
+
+@router.get("/callback")
+async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
+    # GitHub'dan access token al
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            GITHUB_TOKEN_URL,
+            data={
+                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                "code": code,
+            },
+            headers={"Accept": "application/json"},
+        )
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+
+        if not access_token:
+            raise HTTPException(status_code=400, detail="GitHub token alınamadı")
+
+        # Kullanıcı bilgilerini al
+        user_response = await client.get(
+            GITHUB_USER_URL,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+        )
+        github_user = user_response.json()
+
+    # Kullanıcıyı veritabanında bul veya oluştur
+    result = await db.execute(
+        select(User).where(User.github_id == github_user["id"])
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        user = User(
+            github_id=github_user["id"],
+            email=github_user.get("email") or f"{github_user['login']}@github.com",
+            name=github_user.get("name") or github_user["login"],
+            avatar_url=github_user.get("avatar_url"),
+            github_token=access_token,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    else:
+        user.github_token = access_token
+        await db.commit()
+
+    # JWT oluştur
+    payload = {
+        "sub": str(user.id),
+        "email": user.email,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        ),
+    }
+    jwt_token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    # Frontend'e yönlendir
+    return RedirectResponse(
+        url=f"http://localhost:3000/auth/callback?token={jwt_token}"
+    )
