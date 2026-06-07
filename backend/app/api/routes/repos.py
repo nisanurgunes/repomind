@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.models.repo import Repo, RepoSnapshot
 from app.services.github import GithubService
 from app.services.health_score import HealthScoreEngine
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 router = APIRouter()
 
@@ -14,16 +14,6 @@ async def get_repos(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Repo))
     repos = result.scalars().all()
     return {"repos": [{"id": r.id, "full_name": r.full_name, "stars": r.stars} for r in repos]}
-
-@router.get("/{owner}/{name}")
-async def get_repo(owner: str, name: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Repo).where(Repo.full_name == f"{owner}/{name}")
-    )
-    repo = result.scalar_one_or_none()
-    if not repo:
-        raise HTTPException(status_code=404, detail="Repo bulunamadı")
-    return repo
 
 @router.post("/analyze")
 async def analyze_repo(owner: str, name: str, db: AsyncSession = Depends(get_db)):
@@ -81,3 +71,37 @@ async def analyze_repo(owner: str, name: str, db: AsyncSession = Depends(get_db)
         "breakdown": score_data["breakdown"],
         "metrics": score_data["metrics"],
     }
+
+@router.get("/chart/{owner}/{name}/commits")
+async def get_commit_chart(owner: str, name: str):
+    github = GithubService()
+
+    try:
+        commits = await github.get_commits(owner, name, days=90)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    weeks = {}
+    for commit in commits:
+        date_str = commit["commit"]["author"]["date"]
+        date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        week_start = date - timedelta(days=date.weekday())
+        week_key = week_start.strftime("%d %b")
+        weeks[week_key] = weeks.get(week_key, 0) + 1
+
+    chart_data = [
+        {"week": week, "commits": count}
+        for week, count in sorted(weeks.items())
+    ]
+
+    return {"chart_data": chart_data}
+
+@router.get("/{owner}/{name}")
+async def get_repo(owner: str, name: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Repo).where(Repo.full_name == f"{owner}/{name}")
+    )
+    repo = result.scalar_one_or_none()
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repo bulunamadı")
+    return repo

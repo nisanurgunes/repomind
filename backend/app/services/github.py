@@ -1,4 +1,5 @@
 import httpx
+from app.core.config import settings
 from typing import Optional
 
 GITHUB_API_BASE = "https://api.github.com"
@@ -9,8 +10,10 @@ class GithubService:
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        if token:
-            self.headers["Authorization"] = f"Bearer {token}"
+        # Token verilmezse .env'deki GITHUB_TOKEN'ı kullan
+        actual_token = token or settings.GITHUB_TOKEN
+        if actual_token:
+            self.headers["Authorization"] = f"Bearer {actual_token}"
 
     async def get_repo(self, owner: str, name: str) -> dict:
         async with httpx.AsyncClient() as client:
@@ -24,7 +27,7 @@ class GithubService:
     async def get_commits(self, owner: str, name: str, days: int = 90) -> list:
         from datetime import datetime, timedelta
         since = (datetime.utcnow() - timedelta(days=days)).isoformat() + "Z"
-        
+
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{GITHUB_API_BASE}/repos/{owner}/{name}/commits",
