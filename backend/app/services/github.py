@@ -66,3 +66,32 @@ class GithubService:
             )
             response.raise_for_status()
             return response.json()
+
+    async def get_readme_content(self, owner: str, name: str) -> str | None:
+        """README'nin ham metin içeriğini döndür."""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{name}/readme",
+                headers={**self.headers, "Accept": "application/vnd.github.raw+json"},
+            )
+            if response.status_code != 200:
+                return None
+            return response.text
+
+    async def get_community_files(self, owner: str, name: str) -> dict:
+        """README, CONTRIBUTING, LICENSE, ISSUE_TEMPLATE varlığını kontrol et."""
+        checks = {
+            "readme": "README.md",
+            "contributing": "CONTRIBUTING.md",
+            "license": "LICENSE",
+            "issue_template": ".github/ISSUE_TEMPLATE",
+        }
+        results = {}
+        async with httpx.AsyncClient() as client:
+            for key, path in checks.items():
+                response = await client.get(
+                    f"{GITHUB_API_BASE}/repos/{owner}/{name}/contents/{path}",
+                    headers=self.headers,
+                )
+                results[key] = response.status_code == 200
+        return results

@@ -10,9 +10,16 @@ app = FastAPI(
 )
 
 # CORS — frontend Next.js ile konuşabilmek için
+import os
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    os.getenv("FRONTEND_URL", ""),          # Vercel URL'si (env var'dan)
+    os.getenv("FRONTEND_URL_PREVIEW", ""),  # Vercel preview URL'leri
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[o for o in ALLOWED_ORIGINS if o],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # tüm Vercel preview'ları
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
