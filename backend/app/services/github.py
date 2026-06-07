@@ -1,0 +1,65 @@
+import httpx
+from typing import Optional
+
+GITHUB_API_BASE = "https://api.github.com"
+
+class GithubService:
+    def __init__(self, token: Optional[str] = None):
+        self.headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        if token:
+            self.headers["Authorization"] = f"Bearer {token}"
+
+    async def get_repo(self, owner: str, name: str) -> dict:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{name}",
+                headers=self.headers,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_commits(self, owner: str, name: str, days: int = 90) -> list:
+        from datetime import datetime, timedelta
+        since = (datetime.utcnow() - timedelta(days=days)).isoformat() + "Z"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{name}/commits",
+                headers=self.headers,
+                params={"since": since, "per_page": 100},
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_issues(self, owner: str, name: str) -> list:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{name}/issues",
+                headers=self.headers,
+                params={"state": "all", "per_page": 100},
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_pull_requests(self, owner: str, name: str) -> list:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{name}/pulls",
+                headers=self.headers,
+                params={"state": "all", "per_page": 100},
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def get_contributors(self, owner: str, name: str) -> list:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{name}/contributors",
+                headers=self.headers,
+                params={"per_page": 100},
+            )
+            response.raise_for_status()
+            return response.json()
