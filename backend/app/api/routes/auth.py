@@ -86,6 +86,8 @@ async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
     jwt_token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
     # Frontend'e yönlendir
+    import os
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     return RedirectResponse(
-        url=f"http://localhost:3000/auth/callback?token={jwt_token}"
+        url=f"{frontend_url}/auth/callback?token={jwt_token}"
     )
