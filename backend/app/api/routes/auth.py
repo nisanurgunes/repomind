@@ -18,15 +18,20 @@ GITHUB_USER_URL = "https://api.github.com/user"
 
 @router.get("/login")
 async def github_login():
+    import os
+    backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
     github_url = (
         f"{GITHUB_AUTH_URL}"
         f"?client_id={settings.GITHUB_CLIENT_ID}"
         f"&scope=read:user,user:email"
+        f"&redirect_uri={backend_url}/api/auth/callback"
     )
     return RedirectResponse(url=github_url)
 
 @router.get("/callback")
 async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
+    import os
+    backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
     # GitHub'dan access token al
     async with httpx.AsyncClient() as client:
         token_response = await client.post(
@@ -35,6 +40,7 @@ async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
                 "client_id": settings.GITHUB_CLIENT_ID,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
+                "redirect_uri": f"{backend_url}/api/auth/callback",
             },
             headers={"Accept": "application/json"},
         )
