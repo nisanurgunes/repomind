@@ -75,6 +75,7 @@ async def analyze_repo(owner: str, name: str, db: AsyncSession = Depends(get_db)
     await db.commit()
 
     return {
+        "id": repo.id,
         "repo": f"{owner}/{name}",
         "health_score": score_data["health_score"],
         "breakdown": score_data["breakdown"],
