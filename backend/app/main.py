@@ -12,7 +12,7 @@ async def lifespan(app: FastAPI):
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         capture_output=True, text=True,
-        cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        cwd=os.path.dirname(os.path.dirname(__file__))  # backend/ klasörü (alembic.ini burada)
     )
     print("Alembic stdout:", result.stdout)
     print("Alembic stderr:", result.stderr)
