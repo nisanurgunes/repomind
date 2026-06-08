@@ -239,6 +239,96 @@ async def get_repo_history(owner: str, name: str, db: AsyncSession = Depends(get
         ]
     }
 
+@router.get("/{owner}/{name}/contributors-analysis")
+async def get_contributors_analysis(owner: str, name: str):
+    """Ekip analitik verisi — contributor, PR, commit zaman dağılımı, hot spot."""
+    github = GithubService()
+    try:
+        commits = await github.get_commits_detailed(owner, name, days=90)
+        contributors = await github.get_contributors(owner, name)
+        pull_requests = await github.get_pull_requests_detailed(owner, name)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"GitHub API hatası: {str(e)}")
+
+    # --- Contributor bazlı commit sayısı ---
+    contributor_commits: dict[str, int] = {}
+    hourly_counts = [0] * 24
+    daily_counts = [0] * 7  # 0=Mon ... 6=Sun
+    file_changes: dict[str, int] = {}
+
+    for commit in commits:
+        author = (
+            commit.get("author", {}) or {}
+        )
+        login = author.get("login") or (commit.get("commit", {}).get("author", {}).get("name") or "unknown")
+        contributor_commits[login] = contributor_commits.get(login, 0) + 1
+
+        # Commit zamanı
+        date_str = commit.get("commit", {}).get("author", {}).get("date", "")
+        if date_str:
+            try:
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                hourly_counts[dt.hour] += 1
+                daily_counts[dt.weekday()] += 1
+            except Exception:
+                pass
+
+    # Hot spot: top 20 commit için dosya listesini çek (rate limit'e takılmamak için)
+    top_shas = [c["sha"] for c in commits[:20]]
+    for sha in top_shas:
+        files = await github.get_commit_files(owner, name, sha)
+        for f in files:
+            file_changes[f] = file_changes.get(f, 0) + 1
+
+    hot_spots = sorted(file_changes.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    # --- PR metrikleri ---
+    merged_prs = [pr for pr in pull_requests if pr.get("merged_at")]
+    open_prs = [pr for pr in pull_requests if pr.get("state") == "open"]
+
+    merge_hours_list = []
+    for pr in merged_prs:
+        try:
+            created = datetime.fromisoformat(pr["created_at"].replace("Z", "+00:00"))
+            merged = datetime.fromisoformat(pr["merged_at"].replace("Z", "+00:00"))
+            merge_hours_list.append((merged - created).total_seconds() / 3600)
+        except Exception:
+            pass
+
+    avg_merge_hours = round(sum(merge_hours_list) / len(merge_hours_list), 1) if merge_hours_list else None
+
+    total_commits = len(commits)
+    contributor_list = [
+        {
+            "login": login,
+            "commits": count,
+            "percent": round(count / total_commits * 100, 1) if total_commits else 0,
+            "avatar_url": next(
+                (c.get("avatar_url") for c in contributors if c.get("login") == login), None
+            ),
+        }
+        for login, count in sorted(contributor_commits.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    days_labels = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
+
+    return {
+        "contributors": contributor_list,
+        "total_commits": total_commits,
+        "pr_metrics": {
+            "total": len(pull_requests),
+            "merged": len(merged_prs),
+            "open": len(open_prs),
+            "avg_merge_hours": avg_merge_hours,
+        },
+        "commit_heatmap": {
+            "hourly": [{"hour": f"{h:02d}:00", "commits": hourly_counts[h]} for h in range(24)],
+            "daily": [{"day": days_labels[i], "commits": daily_counts[i]} for i in range(7)],
+        },
+        "hot_spots": [{"file": f, "changes": c} for f, c in hot_spots],
+    }
+
+
 @router.get("/{owner}/{name}")
 async def get_repo(owner: str, name: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
