@@ -7,9 +7,15 @@ from app.api.routes import repos, users, auth, notifications, orgs
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: run migrations
-    import subprocess, sys
-    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=False)
+    # Startup: run migrations synchronously before serving
+    import subprocess, sys, os
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        capture_output=True, text=True,
+        cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    )
+    print("Alembic stdout:", result.stdout)
+    print("Alembic stderr:", result.stderr)
     yield
 
 app = FastAPI(
