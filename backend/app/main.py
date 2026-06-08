@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.api.routes import repos, users, auth, notifications
+from app.api.routes import repos, users, auth, notifications, orgs
 
 
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.include_router(repos.router, prefix="/api/repos", tags=["repos"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(orgs.router, prefix="/api/orgs", tags=["orgs"])
 
 @app.get("/")
 async def root():
