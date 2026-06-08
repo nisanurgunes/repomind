@@ -1,12 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.api.routes import repos, users, auth, notifications
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: run migrations
+    import subprocess, sys
+    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=False)
+    yield
 
 app = FastAPI(
     title=settings.APP_NAME,
     debug=settings.DEBUG,
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS — frontend Next.js ile konuşabilmek için
