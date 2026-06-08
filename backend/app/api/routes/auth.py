@@ -48,7 +48,9 @@ async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
         access_token = token_data.get("access_token")
 
         if not access_token:
-            raise HTTPException(status_code=400, detail="GitHub token alınamadı")
+            import logging
+            logging.error(f"GitHub token error: {token_data}")
+            raise HTTPException(status_code=400, detail=f"GitHub token alınamadı: {token_data}")
 
         # Kullanıcı bilgilerini al
         user_response = await client.get(
