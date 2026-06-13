@@ -704,24 +704,60 @@ function AdvisorTab() {
     setLoadingContext(true);
     try {
       const [owner, name] = fullName.split("/");
-      const [repoData, readme] = await Promise.all([
+
+      // Son commit SHA'sını çek — cache geçerliliği buna göre belirlenir
+      const [repoData, commitRes] = await Promise.all([
         fetch(`https://api.github.com/repos/${fullName}`).then(r => r.json()),
-        fetch(`https://api.github.com/repos/${fullName}/readme`, {
-          headers: { Accept: "application/vnd.github.raw+json" }
-        }).then(r => r.ok ? r.text() : "").catch(() => ""),
+        fetch(`https://api.github.com/repos/${fullName}/commits?per_page=1`).then(r => r.json()).catch(() => []),
       ]);
+      const latestSha = Array.isArray(commitRes) && commitRes[0]?.sha ? commitRes[0].sha.slice(0, 8) : "";
+
+      // Cache: aynı commit SHA'ya sahip analiz varsa tekrar çağırma
+      const cacheKey = `advisor_analysis_${fullName}`;
+      let analysis: any = null;
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const { data, sha } = JSON.parse(cached);
+          if (sha === latestSha) analysis = data;
+        }
+      } catch {}
+
+      // Gerekirse derin analiz yap
+      if (!analysis) {
+        analysis = await api.getProjectAnalysis(owner, name).catch(() => null);
+        if (analysis && latestSha) {
+          try { localStorage.setItem(cacheKey, JSON.stringify({ data: analysis, sha: latestSha })); } catch {}
+        }
+      }
+
       const ctx = {
         description: repoData.description || "",
         language: repoData.language || "",
         topics: repoData.topics || [],
-        readme_excerpt: readme.slice(0, 800),
+        project_stage: analysis?.project_stage || "",
+        project_summary: analysis?.project_summary || "",
+        focus_areas: analysis?.focus_areas || [],
+        top_suggestions: (analysis?.suggestions || []).slice(0, 3).map((s: any) => s.title),
       };
       setRepoContext(ctx);
-      // Karşılama mesajı
-      setMessages([{
-        role: "assistant",
-        content: `Merhaba! **${fullName}** projeni inceledim. ${repoData.description ? `"${repoData.description}" — ` : ""}Ne hakkında konuşmak istersin? Yeni bir özellik fikrin mi var, rakiplerle nasıl farklılaşacağını mı düşünüyorsun, yoksa başka bir şey mi?`
-      }]);
+
+      // İlk mesaj: analiz özeti
+      if (analysis) {
+        const stageLabel = { early: "başlangıç", growing: "gelişme", mature: "olgunluk" }[analysis.project_stage as string] || "";
+        const suggestions = (analysis.suggestions || []).slice(0, 3);
+        const suggestionList = suggestions.map((s: any) => `• **${s.title}**`).join("\n");
+
+        setMessages([{
+          role: "assistant",
+          content: `**${fullName}** projesini inceledim.\n\n${analysis.project_summary}\n\nProje şu an **${stageLabel} aşamasında**. Öne çıkan geliştirme alanları:\n${suggestionList}\n\nBu önerilerden birini derinlemesine konuşmak ister misin, yoksa farklı bir konu mu var aklında?`,
+        }]);
+      } else {
+        setMessages([{
+          role: "assistant",
+          content: `**${fullName}** projesine baktım.${repoData.description ? ` "${repoData.description}"` : ""} Ne konuşmak istersin?`,
+        }]);
+      }
     } catch {
       setRepoContext({});
     }
@@ -824,8 +860,9 @@ function AdvisorTab() {
       <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1">
         {messages.length === 0 && loadingContext && (
           <div className="text-center py-12 text-gray-400">
-            <div className="text-3xl mb-3 animate-pulse">💬</div>
-            <p className="text-sm">Proje bağlamı hazırlanıyor...</p>
+            <div className="text-3xl mb-3 animate-pulse">🔍</div>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Proje analiz ediliyor...</p>
+            <p className="text-xs mt-1">Kod yapısı, commit geçmişi ve issue'lar inceleniyor.</p>
           </div>
         )}
         {messages.map((m, i) => (
