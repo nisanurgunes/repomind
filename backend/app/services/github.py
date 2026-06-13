@@ -114,6 +114,34 @@ class GithubService:
             data = response.json()
             return [f["filename"] for f in data.get("files", [])]
 
+    async def search_similar_repos(self, owner: str, name: str, repo_data: dict) -> list:
+        """Verilen repoya benzer repoları GitHub search API ile bul."""
+        language = repo_data.get("language") or ""
+        topics = repo_data.get("topics", [])
+        description = repo_data.get("description") or ""
+
+        # Arama sorgusu: topic'ler varsa onlarla, yoksa dil + description keyword'leriyle
+        if topics:
+            topic_query = " ".join(f"topic:{t}" for t in topics[:3])
+            query = f"{topic_query} language:{language} stars:>50" if language else f"{topic_query} stars:>50"
+        else:
+            # Description'dan ilk 3 kelimeyi al
+            keywords = " ".join(description.split()[:5]) if description else name
+            query = f"{keywords} language:{language} stars:>50" if language else f"{keywords} stars:>50"
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/search/repositories",
+                headers=self.headers,
+                params={"q": query, "sort": "stars", "order": "desc", "per_page": 6},
+            )
+            if response.status_code != 200:
+                return []
+            items = response.json().get("items", [])
+            # Kendi reposunu çıkar
+            full_name = f"{owner}/{name}".lower()
+            return [r for r in items if r["full_name"].lower() != full_name][:5]
+
     async def get_community_files(self, owner: str, name: str) -> dict:
         """README, CONTRIBUTING, LICENSE, ISSUE_TEMPLATE varlığını kontrol et."""
         checks = {

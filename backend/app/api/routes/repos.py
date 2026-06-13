@@ -329,6 +329,122 @@ async def get_contributors_analysis(owner: str, name: str):
     }
 
 
+@router.get("/{owner}/{name}/feature-gap")
+async def get_feature_gap(owner: str, name: str):
+    """
+    Verilen repoya benzer projeleri bul, README'lerini analiz et ve
+    'onlarda var, sende yok' feature önerileri üret.
+    """
+    import anthropic
+    import os
+
+    github = GithubService()
+
+    try:
+        repo_data = await github.get_repo(owner, name)
+        user_readme = await github.get_readme_content(owner, name) or ""
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"GitHub API hatası: {str(e)}")
+
+    # Benzer repoları bul
+    try:
+        similar_repos = await github.search_similar_repos(owner, name, repo_data)
+    except Exception:
+        similar_repos = []
+
+    if not similar_repos:
+        raise HTTPException(status_code=404, detail="Benzer repo bulunamadı.")
+
+    # Benzer repoların README'lerini çek
+    similar_readmes = []
+    for repo in similar_repos[:4]:
+        try:
+            r_owner, r_name = repo["full_name"].split("/")
+            readme = await github.get_readme_content(r_owner, r_name)
+            if readme:
+                similar_readmes.append({
+                    "full_name": repo["full_name"],
+                    "description": repo.get("description") or "",
+                    "stars": repo.get("stargazers_count", 0),
+                    "readme": readme[:3000],  # token limitini aş
+                })
+        except Exception:
+            continue
+
+    if not similar_readmes:
+        raise HTTPException(status_code=404, detail="Benzer repoların README'leri okunamadı.")
+
+    # Claude ile gap analizi
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY eksik.")
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    similar_text = "\n\n".join([
+        f"## {r['full_name']} ({r['stars']:,} ⭐)\n{r['description']}\n\nREADME:\n{r['readme']}"
+        for r in similar_readmes
+    ])
+
+    prompt = f"""Sen bir yazılım geliştirici asistanısın. Kullanıcının GitHub reposunu benzer projelerle karşılaştırıp eksik feature önerileri sunacaksın.
+
+## Kullanıcının reposu: {owner}/{name}
+Açıklama: {repo_data.get('description') or 'Yok'}
+Dil: {repo_data.get('language') or 'Bilinmiyor'}
+Topics: {', '.join(repo_data.get('topics', [])) or 'Yok'}
+
+README:
+{user_readme[:3000]}
+
+---
+
+## Benzer projeler ve README'leri:
+{similar_text}
+
+---
+
+Görevin:
+1. Benzer projelerde görülen ama kullanıcının projesinde olmayan önemli feature'ları tespit et.
+2. Her öneri için somut ve uygulanabilir bir açıklama yaz.
+3. Teknik jargon kullan ama anlaşılır ol.
+
+SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
+{{
+  "similar_repos": [
+    {{"full_name": "...", "stars": 0, "description": "..."}}
+  ],
+  "suggestions": [
+    {{
+      "title": "Kısa başlık (max 8 kelime)",
+      "description": "Bu feature nedir ve neden faydalı (2-3 cümle)",
+      "seen_in": ["repo/adı"],
+      "priority": "high|medium|low",
+      "effort": "small|medium|large"
+    }}
+  ],
+  "summary": "Genel değerlendirme — 2-3 cümle"
+}}"""
+
+    try:
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        import json
+        raw = message.content[0].text.strip()
+        # JSON bloğu varsa çıkar
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        result = json.loads(raw)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analiz hatası: {str(e)}")
+
+    return result
+
+
 @router.get("/{owner}/{name}")
 async def get_repo(owner: str, name: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
