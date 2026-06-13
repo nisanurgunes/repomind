@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import AppShell from "@/components/AppShell";
 
@@ -690,6 +690,8 @@ function AdvisorTab() {
   const [sending, setSending] = useState(false);
   const [repoSource, setRepoSource] = useState<"mine" | "watchlist">("mine");
   const bottomRef = useState<HTMLDivElement | null>(null);
+  // Session içi analiz cache — geri gelince tekrar analiz yapma
+  const analysisCache = useRef<Record<string, { context: object; messages: ChatMessage[] }>>({});
 
   useEffect(() => {
     api.getMyRepos().then((d) => setMyRepos(d.repos || [])).catch(() => {});
@@ -699,6 +701,15 @@ function AdvisorTab() {
   const selectRepo = async (fullName: string) => {
     if (selectedRepo === fullName) return;
     setSelectedRepo(fullName);
+
+    // Session cache: bu repo daha önce analiz edildiyse direkt yükle
+    if (analysisCache.current[fullName]) {
+      const { context, messages: cachedMessages } = analysisCache.current[fullName];
+      setRepoContext(context);
+      setMessages(cachedMessages);
+      return;
+    }
+
     setMessages([]);
     setRepoContext(null);
     setLoadingContext(true);
@@ -743,21 +754,25 @@ function AdvisorTab() {
       setRepoContext(ctx);
 
       // İlk mesaj: analiz özeti
+      let firstMessage: ChatMessage;
       if (analysis) {
         const stageLabel = { early: "başlangıç", growing: "gelişme", mature: "olgunluk" }[analysis.project_stage as string] || "";
         const suggestions = (analysis.suggestions || []).slice(0, 3);
         const suggestionList = suggestions.map((s: any) => `• **${s.title}**`).join("\n");
 
-        setMessages([{
+        firstMessage = {
           role: "assistant",
           content: `**${fullName}** projesini inceledim.\n\n${analysis.project_summary}\n\nProje şu an **${stageLabel} aşamasında**. Öne çıkan geliştirme alanları:\n${suggestionList}\n\nBu önerilerden birini derinlemesine konuşmak ister misin, yoksa farklı bir konu mu var aklında?`,
-        }]);
+        };
       } else {
-        setMessages([{
+        firstMessage = {
           role: "assistant",
           content: `**${fullName}** projesine baktım.${repoData.description ? ` "${repoData.description}"` : ""} Ne konuşmak istersin?`,
-        }]);
+        };
       }
+      setMessages([firstMessage]);
+      // Session cache'e kaydet
+      analysisCache.current[fullName] = { context: ctx, messages: [firstMessage] };
     } catch {
       setRepoContext({});
     }
