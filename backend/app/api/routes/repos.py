@@ -329,6 +329,55 @@ async def get_contributors_analysis(owner: str, name: str):
     }
 
 
+@router.post("/{owner}/{name}/advisor-chat")
+async def advisor_chat(owner: str, name: str, body: dict):
+    """
+    Repo bağlamını bilen ürün danışmanı AI ile serbest chat.
+    body: { messages: [{role, content}], repo_context: {description, language, topics, readme_excerpt} }
+    """
+    import anthropic, os
+
+    messages = body.get("messages", [])
+    repo_context = body.get("repo_context", {})
+
+    if not messages:
+        raise HTTPException(status_code=400, detail="Mesaj gerekli.")
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY eksik.")
+
+    system_prompt = f"""Sen deneyimli bir ürün danışmanı ve startup mentörüsün. Kullanıcı seninle kendi GitHub projesi hakkında fikir tartışıyor.
+
+Proje Bağlamı:
+- Repo: {owner}/{name}
+- Açıklama: {repo_context.get('description') or 'Belirtilmemiş'}
+- Dil/Stack: {repo_context.get('language') or 'Belirtilmemiş'}
+- Topics: {', '.join(repo_context.get('topics', [])) or 'Yok'}
+- README özeti: {repo_context.get('readme_excerpt') or 'Yok'}
+
+Görevin:
+- Kullanıcının fikirlerini dinle, gerçekçi ve dürüst değerlendir
+- Hem teknik hem ürün perspektifinden bakış aç
+- Alternatifleri ve riskleri belirt
+- "Bunu neden yapmak istiyorsun?" gibi netleştirici sorular sor
+- Somut örnekler ve benzer ürünlerden referanslar ver
+- Uzun akademik analizler değil, kısa ve aksiyon odaklı cevaplar ver
+- Türkçe konuş"""
+
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=messages,
+        )
+        return {"reply": response.content[0].text}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Yanıt alınamadı. Tekrar deneyin.")
+
+
 @router.get("/{owner}/{name}/project-analysis")
 async def get_project_analysis(owner: str, name: str):
     """
