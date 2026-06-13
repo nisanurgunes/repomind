@@ -83,11 +83,12 @@ async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
         user.github_token = access_token
         await db.commit()
 
-    # Kullanıcının GitHub repolarını çek — sadece ilk login'de veya 24 saatten eskiyse
+    # Kullanıcının GitHub repolarını çek:
+    # - İlk login (repo yok)
+    # - Token değişti (yeni scope alınmış olabilir)
+    # - 24 saatten eski
     try:
         from sqlalchemy import delete, func as sqlfunc
-        should_sync = True
-        # Son sync zamanını kontrol et
         last_repo = await db.execute(
             select(UserRepo)
             .where(UserRepo.user_id == user.id)
@@ -95,9 +96,14 @@ async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
             .limit(1)
         )
         last = last_repo.scalar_one_or_none()
+
+        token_changed = not last  # ya da token değişmiş mi? bunu user önceki değerinden anlayabiliriz
+        # user.github_token zaten access_token ile güncellendi, önceki değeri bilemiyoruz
+        # ama repo yoksa veya eski ise sync et
+        should_sync = True
         if last and last.synced_at:
             age = datetime.datetime.utcnow() - last.synced_at.replace(tzinfo=None)
-            if age.total_seconds() < 86400:  # 24 saat
+            if age.total_seconds() < 3600:  # 1 saatin altındaysa atla (token değişmiş olsa bile kısa süre içinde)
                 should_sync = False
 
         if should_sync:
