@@ -23,7 +23,7 @@ async def github_login():
     github_url = (
         f"{GITHUB_AUTH_URL}"
         f"?client_id={settings.GITHUB_CLIENT_ID}"
-        f"&scope=read:user,user:email"
+        f"&scope=read:user,user:email,repo"
         f"&redirect_uri={backend_url}/api/auth/callback"
     )
     return RedirectResponse(url=github_url)
