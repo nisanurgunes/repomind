@@ -30,6 +30,27 @@ class User(Base):
     # Relations
     watchlist: Mapped[list["Watchlist"]] = relationship(back_populates="user")
     org_memberships: Mapped[list["OrganizationMember"]] = relationship(back_populates="user")
+    own_repos: Mapped[list["UserRepo"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class UserRepo(Base):
+    """Kullanıcının kendi GitHub repoları — login'de otomatik çekilir."""
+    __tablename__ = "user_repos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    github_repo_id: Mapped[int] = mapped_column(Integer, index=True)
+    full_name: Mapped[str] = mapped_column(String(255), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    language: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    stars: Mapped[int] = mapped_column(Integer, default=0)
+    is_private: Mapped[bool] = mapped_column(Boolean, default=False)
+    synced_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship(back_populates="own_repos")
 
 
 class OrgRole(str, enum.Enum):

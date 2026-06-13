@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.user import User
+from app.models.user import User, UserRepo
 from app.models.repo import Watchlist
 import httpx
 import jwt
@@ -82,6 +82,37 @@ async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
     else:
         user.github_token = access_token
         await db.commit()
+
+    # Kullanıcının GitHub repolarını çek ve kaydet (arka planda)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            repos_response = await client.get(
+                "https://api.github.com/user/repos",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/vnd.github+json",
+                },
+                params={"per_page": 100, "sort": "updated", "affiliation": "owner"},
+            )
+            if repos_response.status_code == 200:
+                github_repos = repos_response.json()
+                # Mevcut user_repos'u sil, yeniden ekle (sync)
+                from sqlalchemy import delete
+                await db.execute(delete(UserRepo).where(UserRepo.user_id == user.id))
+                for r in github_repos[:50]:  # max 50 repo
+                    db.add(UserRepo(
+                        user_id=user.id,
+                        github_repo_id=r["id"],
+                        full_name=r["full_name"],
+                        name=r["name"],
+                        description=r.get("description"),
+                        language=r.get("language"),
+                        stars=r.get("stargazers_count", 0),
+                        is_private=r.get("private", False),
+                    ))
+                await db.commit()
+    except Exception:
+        pass  # Repo sync hatası login'i engellemesin
 
     # JWT oluştur
     payload = {

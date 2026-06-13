@@ -329,6 +329,137 @@ async def get_contributors_analysis(owner: str, name: str):
     }
 
 
+@router.get("/{owner}/{name}/project-analysis")
+async def get_project_analysis(owner: str, name: str):
+    """
+    Kullanıcının kendi projesini derin analiz eder:
+    - Kod yapısı, README, config dosyaları
+    - Son commit geçmişi (ne üzerinde çalışılmış)
+    - Issues (neler bekliyor)
+    Karşılaştırma yapmadan, projenin kendisine özgü AI feature önerisi üretir.
+    """
+    import anthropic, os, json
+
+    github = GithubService()
+
+    try:
+        repo_data = await github.get_repo(owner, name)
+        readme = await github.get_readme_content(owner, name) or ""
+        file_tree = await github.get_file_tree(owner, name)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"GitHub API hatası: {str(e)}")
+
+    # Önemli config/entry dosyalarını oku
+    key_files_content = {}
+    key_file_candidates = [
+        f for f in file_tree
+        if any(f.endswith(ext) for ext in [
+            "package.json", "pyproject.toml", "requirements.txt",
+            "Dockerfile", "docker-compose.yml", "Makefile",
+            "go.mod", "Cargo.toml", "pom.xml", ".env.example"
+        ])
+    ]
+    for path in key_file_candidates[:5]:
+        content = await github.get_file_content(owner, name, path)
+        if content:
+            key_files_content[path] = content
+
+    # Son commit'leri çek (son 30 gün)
+    try:
+        commits_raw = await github.get_commits(owner, name, days=30)
+        recent_commits = [
+            f"- {c['commit']['message'].split(chr(10))[0][:100]} ({c['commit']['author']['date'][:10]})"
+            for c in commits_raw[:20]
+        ]
+    except Exception:
+        recent_commits = []
+
+    # Açık issue'ları çek
+    try:
+        issues_raw = await github.get_issues(owner, name)
+        open_issues = [
+            f"- {i['title'][:100]}"
+            for i in issues_raw
+            if i.get("state") == "open" and "pull_request" not in i
+        ][:15]
+    except Exception:
+        open_issues = []
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY eksik.")
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    file_tree_str = "\n".join(file_tree[:60]) if file_tree else "Bilgi yok"
+    key_files_str = "\n\n".join([f"### {p}\n{c}" for p, c in key_files_content.items()]) or "Yok"
+    commits_str = "\n".join(recent_commits) if recent_commits else "Son commit bulunamadı"
+    issues_str = "\n".join(open_issues) if open_issues else "Açık issue yok"
+
+    prompt = f"""Sen deneyimli bir yazılım mühendisisin. Aşağıdaki GitHub projesini derinlemesine analiz et ve geliştirme önerileri sun.
+
+## Proje: {owner}/{name}
+Açıklama: {repo_data.get('description') or 'Yok'}
+Dil: {repo_data.get('language') or 'Bilinmiyor'}
+Topics: {', '.join(repo_data.get('topics', [])) or 'Yok'}
+Stars: {repo_data.get('stargazers_count', 0):,}
+Open Issues: {repo_data.get('open_issues_count', 0)}
+
+## Dosya Yapısı:
+{file_tree_str}
+
+## Önemli Dosyalar:
+{key_files_str}
+
+## README:
+{readme[:2500]}
+
+## Son 30 Günlük Commit Geçmişi:
+{commits_str}
+
+## Açık Issue'lar:
+{issues_str}
+
+---
+
+Görevin: Bu projenin mevcut durumunu, commit geçmişini ve issue'larını dikkate alarak:
+1. Projenin hangi aşamada olduğunu anla (başlangıç/gelişme/olgunlaşma)
+2. Kod yapısına ve commit geçmişine göre eksik veya geliştirilmesi gereken alanları tespit et
+3. Pratik, öncelikli ve bu projeye özgü feature/iyileştirme önerileri sun
+
+SADECE JSON formatında yanıt ver:
+{{
+  "project_stage": "early|growing|mature",
+  "project_summary": "Projenin ne yaptığı ve nerede olduğu hakkında 2-3 cümle",
+  "suggestions": [
+    {{
+      "title": "Kısa başlık (max 8 kelime)",
+      "description": "Bu önerinin neden bu projeye uygun olduğunu açıkla (2-3 cümle)",
+      "rationale": "Commit geçmişi veya kod yapısından neden bu öneriyi çıkardın (1 cümle)",
+      "priority": "high|medium|low",
+      "effort": "small|medium|large",
+      "category": "feature|refactor|devops|testing|docs|security"
+    }}
+  ],
+  "focus_areas": ["Mevcut odak alanı 1", "Mevcut odak alanı 2"]
+}}"""
+
+    try:
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = message.content[0].text.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analiz hatası: {str(e)}")
+
+
 @router.get("/{owner}/{name}/feature-gap")
 async def get_feature_gap(owner: str, name: str):
     """

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.user import User
+from app.models.user import User, UserRepo
 from app.models.repo import Repo, Watchlist
 
 router = APIRouter()
@@ -73,6 +73,33 @@ async def add_to_watchlist(
     db.add(watchlist)
     await db.commit()
     return {"status": "eklendi", "repo": repo.full_name}
+
+@router.get("/my-repos")
+async def get_my_repos(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Kullanıcının kendi GitHub repoları (login'de sync edilir)."""
+    result = await db.execute(
+        select(UserRepo)
+        .where(UserRepo.user_id == current_user.id)
+        .order_by(UserRepo.stars.desc())
+    )
+    repos = result.scalars().all()
+    return {
+        "repos": [
+            {
+                "id": r.id,
+                "full_name": r.full_name,
+                "name": r.name,
+                "description": r.description,
+                "language": r.language,
+                "stars": r.stars,
+                "is_private": r.is_private,
+            }
+            for r in repos
+        ]
+    }
 
 @router.delete("/watchlist/{repo_id}")
 async def remove_from_watchlist(
