@@ -2,20 +2,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.api.routes import repos, users, auth, notifications, orgs
+from app.api.routes import repos, users, auth, notifications, orgs, features
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: run migrations synchronously before serving
-    import subprocess, sys, os
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", "upgrade", "head"],
-        capture_output=True, text=True,
-        cwd=os.path.dirname(os.path.dirname(__file__))  # backend/ klasörü (alembic.ini burada)
-    )
-    print("Alembic stdout:", result.stdout)
-    print("Alembic stderr:", result.stderr)
+    # Startup: tüm tabloları create_all ile oluştur (eksik olanları ekler, varları dokunmaz)
+    from app.core.database import engine, Base
+    import app.models.repo  # noqa — modelleri Base'e kaydet
+    import app.models.user  # noqa
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("✅ DB tabloları hazır.")
     yield
 
 app = FastAPI(
@@ -47,6 +45,7 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(orgs.router, prefix="/api/orgs", tags=["orgs"])
+app.include_router(features.router, prefix="/api/features", tags=["features"])
 
 @app.get("/")
 async def root():

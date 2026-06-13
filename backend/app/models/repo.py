@@ -114,6 +114,29 @@ class Notification(Base):
     repo: Mapped["Repo"] = relationship()
 
 
+class FeatureStatus(str, enum.Enum):
+    pending = "pending"
+    in_progress = "in_progress"
+    done = "done"
+
+
+class SavedFeature(Base):
+    __tablename__ = "saved_features"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    repo_full_name: Mapped[str] = mapped_column(String(511), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text)
+    priority: Mapped[str] = mapped_column(String(20), default="medium")
+    effort: Mapped[str] = mapped_column(String(20), default="medium")
+    status: Mapped[FeatureStatus] = mapped_column(Enum(FeatureStatus), default=FeatureStatus.pending)
+    seen_in: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship()
+
+
 class AnalysisJob(Base):
     __tablename__ = "analysis_jobs"
 

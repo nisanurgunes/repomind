@@ -343,8 +343,24 @@ async def get_feature_gap(owner: str, name: str):
     try:
         repo_data = await github.get_repo(owner, name)
         user_readme = await github.get_readme_content(owner, name) or ""
+        file_tree = await github.get_file_tree(owner, name)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"GitHub API hatası: {str(e)}")
+
+    # Önemli config/entry dosyalarını oku (package.json, pyproject.toml, vb.)
+    key_files_content = {}
+    key_file_candidates = [
+        f for f in file_tree
+        if any(f.endswith(ext) for ext in [
+            "package.json", "pyproject.toml", "requirements.txt",
+            "Dockerfile", "docker-compose.yml", ".github/workflows",
+            "Makefile", "go.mod", "Cargo.toml", "pom.xml"
+        ])
+    ]
+    for path in key_file_candidates[:4]:
+        content = await github.get_file_content(owner, name, path)
+        if content:
+            key_files_content[path] = content
 
     # Benzer repoları bul
     try:
@@ -386,15 +402,24 @@ async def get_feature_gap(owner: str, name: str):
         for r in similar_readmes
     ])
 
-    prompt = f"""Sen bir yazılım geliştirici asistanısın. Kullanıcının GitHub reposunu benzer projelerle karşılaştırıp eksik feature önerileri sunacaksın.
+    file_tree_str = "\n".join(file_tree[:60]) if file_tree else "Bilgi yok"
+    key_files_str = "\n\n".join([f"### {path}\n{content}" for path, content in key_files_content.items()]) if key_files_content else "Yok"
+
+    prompt = f"""Sen bir yazılım geliştirici asistanısın. Kullanıcının GitHub reposunu hem kendi kodu hem de benzer projelerle karşılaştırıp eksik feature önerileri sunacaksın.
 
 ## Kullanıcının reposu: {owner}/{name}
 Açıklama: {repo_data.get('description') or 'Yok'}
 Dil: {repo_data.get('language') or 'Bilinmiyor'}
 Topics: {', '.join(repo_data.get('topics', [])) or 'Yok'}
 
+Dosya yapısı:
+{file_tree_str}
+
+Önemli dosyalar:
+{key_files_str}
+
 README:
-{user_readme[:3000]}
+{user_readme[:2000]}
 
 ---
 

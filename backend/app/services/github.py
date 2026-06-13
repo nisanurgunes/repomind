@@ -114,6 +114,31 @@ class GithubService:
             data = response.json()
             return [f["filename"] for f in data.get("files", [])]
 
+    async def get_file_tree(self, owner: str, name: str) -> list[str]:
+        """Repo'nun üst seviye dosya/klasör yapısını döndür."""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{name}/git/trees/HEAD",
+                headers=self.headers,
+                params={"recursive": "1"},
+            )
+            if response.status_code != 200:
+                return []
+            tree = response.json().get("tree", [])
+            # Sadece dosya yollarını al, çok derin olanları atla
+            return [item["path"] for item in tree if item["type"] == "blob" and item["path"].count("/") <= 2][:80]
+
+    async def get_file_content(self, owner: str, name: str, path: str) -> str | None:
+        """Belirli bir dosyanın içeriğini al."""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{GITHUB_API_BASE}/repos/{owner}/{name}/contents/{path}",
+                headers={**self.headers, "Accept": "application/vnd.github.raw+json"},
+            )
+            if response.status_code != 200:
+                return None
+            return response.text[:2000]  # Token limiti için kırp
+
     async def search_similar_repos(self, owner: str, name: str, repo_data: dict) -> list:
         """Verilen repoya benzer repoları GitHub search API ile bul."""
         language = repo_data.get("language") or ""
