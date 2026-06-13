@@ -347,6 +347,11 @@ async def advisor_chat(owner: str, name: str, body: dict):
     if not api_key:
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY eksik.")
 
+    focus_areas = repo_context.get('focus_areas', [])
+    top_suggestions = repo_context.get('top_suggestions', [])
+    project_summary = repo_context.get('project_summary', '')
+    project_stage = repo_context.get('project_stage', '')
+
     system_prompt = f"""Sen deneyimli bir ürün danışmanı ve startup mentörüsün. Kullanıcı seninle kendi GitHub projesi hakkında fikir tartışıyor.
 
 Proje Bağlamı:
@@ -354,16 +359,19 @@ Proje Bağlamı:
 - Açıklama: {repo_context.get('description') or 'Belirtilmemiş'}
 - Dil/Stack: {repo_context.get('language') or 'Belirtilmemiş'}
 - Topics: {', '.join(repo_context.get('topics', [])) or 'Yok'}
-- README özeti: {repo_context.get('readme_excerpt') or 'Yok'}
+{f'- Proje Aşaması: {project_stage}' if project_stage else ''}
+{f'- Proje Özeti: {project_summary}' if project_summary else ''}
+{f'- Tespit Edilen Odak Alanları: {", ".join(focus_areas)}' if focus_areas else ''}
+{f'- Önerilen Geliştirmeler: {", ".join(top_suggestions)}' if top_suggestions else ''}
 
 Görevin:
-- Kullanıcının fikirlerini dinle, gerçekçi ve dürüst değerlendir
-- Hem teknik hem ürün perspektifinden bakış aç
-- Alternatifleri ve riskleri belirt
-- "Bunu neden yapmak istiyorsun?" gibi netleştirici sorular sor
-- Somut örnekler ve benzer ürünlerden referanslar ver
-- Uzun akademik analizler değil, kısa ve aksiyon odaklı cevaplar ver
-- Türkçe konuş"""
+- Projeyi zaten analiz ettin — kod yapısı, commit geçmişi, issue'lar incelendi. Bu bilgilere dayanarak konuş.
+- Kullanıcıya "Projen ne yapıyor?", "Hedef kitlen kim?" gibi sorular SORMA. Bu bilgileri zaten analiz ettin.
+- Kullanıcı bir konu açtığında direkt görüşünü söyle, önce soru sormaya geçme.
+- Analiz bulgularına dayanarak projeye özgü somut öneriler ver.
+- Gerektiğinde kullanıcının fikirlerini değerlendir, riskleri ve alternatifleri belirt.
+- Kısa ve aksiyon odaklı yanıtlar ver.
+- Türkçe konuş."""
 
     client = anthropic.Anthropic(api_key=api_key)
     try:
