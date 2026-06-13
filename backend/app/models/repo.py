@@ -1,7 +1,8 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Enum, func, Text
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Enum, func, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 import enum
+import uuid
 
 class SeverityType(str, enum.Enum):
     low = "low"
@@ -64,7 +65,7 @@ class Watchlist(Base):
     __tablename__ = "watchlist"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), index=True)
     repo_id: Mapped[int] = mapped_column(ForeignKey("repos.id"), index=True)
     notify_on_score_drop: Mapped[bool] = mapped_column(Boolean, default=True)
     added_at: Mapped[DateTime] = mapped_column(
@@ -101,7 +102,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), index=True)
     repo_id: Mapped[int] = mapped_column(ForeignKey("repos.id"), index=True)
     type: Mapped[NotificationType] = mapped_column(Enum(NotificationType))
     message: Mapped[str] = mapped_column(Text)
@@ -124,7 +125,7 @@ class SavedFeature(Base):
     __tablename__ = "saved_features"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), index=True)
     repo_full_name: Mapped[str] = mapped_column(String(511), index=True)
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str] = mapped_column(Text)

@@ -16,14 +16,17 @@ async def get_current_user(
     token = credentials.credentials
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id = int(payload.get("sub"))
+        user_id = payload.get("sub")
+        if not user_id:
+            raise ValueError("sub missing")
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Geçersiz token",
         )
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    import uuid as _uuid
+    result = await db.execute(select(User).where(User.id == _uuid.UUID(str(user_id))))
     user = result.scalar_one_or_none()
 
     if not user:

@@ -1,7 +1,8 @@
-from sqlalchemy import String, Enum, DateTime, ForeignKey, func, Integer, Boolean, Text
+from sqlalchemy import String, Enum, DateTime, ForeignKey, func, Integer, Boolean, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 import enum
+import uuid
 
 class PlanType(str, enum.Enum):
     free = "free"
@@ -11,7 +12,7 @@ class PlanType(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255))
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -38,7 +39,7 @@ class UserRepo(Base):
     __tablename__ = "user_repos"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), index=True)
     github_repo_id: Mapped[int] = mapped_column(Integer, index=True)
     full_name: Mapped[str] = mapped_column(String(255), index=True)
     name: Mapped[str] = mapped_column(String(255))
@@ -82,7 +83,7 @@ class OrganizationMember(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), index=True)
     role: Mapped[OrgRole] = mapped_column(Enum(OrgRole), default=OrgRole.member)
     joined_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -97,7 +98,7 @@ class OrgInvite(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
-    invited_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    invited_by: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), index=True)
     email: Mapped[str] = mapped_column(String(255), index=True)
     token: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     is_accepted: Mapped[bool] = mapped_column(Boolean, default=False)
