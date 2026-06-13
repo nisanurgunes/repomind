@@ -83,34 +83,48 @@ async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
         user.github_token = access_token
         await db.commit()
 
-    # Kullanıcının GitHub repolarını çek ve kaydet (arka planda)
+    # Kullanıcının GitHub repolarını çek — sadece ilk login'de veya 24 saatten eskiyse
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            repos_response = await client.get(
-                "https://api.github.com/user/repos",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/vnd.github+json",
-                },
-                params={"per_page": 100, "sort": "updated", "affiliation": "owner"},
-            )
-            if repos_response.status_code == 200:
-                github_repos = repos_response.json()
-                # Mevcut user_repos'u sil, yeniden ekle (sync)
-                from sqlalchemy import delete
-                await db.execute(delete(UserRepo).where(UserRepo.user_id == user.id))
-                for r in github_repos[:50]:  # max 50 repo
-                    db.add(UserRepo(
-                        user_id=user.id,
-                        github_repo_id=r["id"],
-                        full_name=r["full_name"],
-                        name=r["name"],
-                        description=r.get("description"),
-                        language=r.get("language"),
-                        stars=r.get("stargazers_count", 0),
-                        is_private=r.get("private", False),
-                    ))
-                await db.commit()
+        from sqlalchemy import delete, func as sqlfunc
+        should_sync = True
+        # Son sync zamanını kontrol et
+        last_repo = await db.execute(
+            select(UserRepo)
+            .where(UserRepo.user_id == user.id)
+            .order_by(UserRepo.synced_at.desc())
+            .limit(1)
+        )
+        last = last_repo.scalar_one_or_none()
+        if last and last.synced_at:
+            age = datetime.datetime.utcnow() - last.synced_at.replace(tzinfo=None)
+            if age.total_seconds() < 86400:  # 24 saat
+                should_sync = False
+
+        if should_sync:
+            async with httpx.AsyncClient(timeout=10.0) as repo_client:
+                repos_response = await repo_client.get(
+                    "https://api.github.com/user/repos",
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Accept": "application/vnd.github+json",
+                    },
+                    params={"per_page": 100, "sort": "updated", "affiliation": "owner"},
+                )
+                if repos_response.status_code == 200:
+                    github_repos = repos_response.json()
+                    await db.execute(delete(UserRepo).where(UserRepo.user_id == user.id))
+                    for r in github_repos[:50]:
+                        db.add(UserRepo(
+                            user_id=user.id,
+                            github_repo_id=r["id"],
+                            full_name=r["full_name"],
+                            name=r["name"],
+                            description=r.get("description"),
+                            language=r.get("language"),
+                            stars=r.get("stargazers_count", 0),
+                            is_private=r.get("private", False),
+                        ))
+                    await db.commit()
     except Exception:
         pass  # Repo sync hatası login'i engellemesin
 

@@ -447,17 +447,20 @@ SADECE JSON formatında yanıt ver:
     try:
         message = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2000,
+            max_tokens=4096,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = message.content[0].text.strip()
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        return json.loads(raw)
+        # JSON bloğunu güvenli çıkar
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start == -1 or end == 0:
+            raise ValueError("JSON bulunamadı")
+        return json.loads(raw[start:end])
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Analiz tamamlanamadı. Lütfen tekrar deneyin.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analiz hatası: {str(e)}")
+        raise HTTPException(status_code=500, detail="Analiz sırasında bir hata oluştu. Lütfen tekrar deneyin.")
 
 
 @router.get("/{owner}/{name}/feature-gap")
@@ -584,21 +587,20 @@ SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
     try:
         message = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2000,
+            max_tokens=4096,
             messages=[{"role": "user", "content": prompt}]
         )
         import json
         raw = message.content[0].text.strip()
-        # JSON bloğu varsa çıkar
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        result = json.loads(raw)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analiz hatası: {str(e)}")
-
-    return result
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start == -1 or end == 0:
+            raise ValueError("JSON bulunamadı")
+        return json.loads(raw[start:end])
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Analiz tamamlanamadı. Lütfen tekrar deneyin.")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Analiz sırasında bir hata oluştu. Lütfen tekrar deneyin.")
 
 
 @router.get("/{owner}/{name}")

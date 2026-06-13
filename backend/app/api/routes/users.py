@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from app.core.database import get_db
 from app.core.auth import get_current_user
+import httpx
 from app.models.user import User, UserRepo
 from app.models.repo import Repo, Watchlist
 
@@ -73,6 +74,47 @@ async def add_to_watchlist(
     db.add(watchlist)
     await db.commit()
     return {"status": "eklendi", "repo": repo.full_name}
+
+@router.post("/sync-repos")
+async def sync_my_repos(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """GitHub token'ı ile repoları zorla yeniler."""
+    if not current_user.github_token:
+        raise HTTPException(status_code=400, detail="GitHub token bulunamadı. Tekrar giriş yap.")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        response = await client.get(
+            "https://api.github.com/user/repos",
+            headers={
+                "Authorization": f"Bearer {current_user.github_token}",
+                "Accept": "application/vnd.github+json",
+            },
+            params={"per_page": 100, "sort": "updated", "affiliation": "owner"},
+        )
+
+    if response.status_code == 401:
+        raise HTTPException(status_code=401, detail="GitHub erişimi sona ermiş. Tekrar giriş yap.")
+    if response.status_code != 200:
+        raise HTTPException(status_code=502, detail="GitHub'dan repolar alınamadı.")
+
+    github_repos = response.json()
+    await db.execute(delete(UserRepo).where(UserRepo.user_id == current_user.id))
+    for r in github_repos[:50]:
+        db.add(UserRepo(
+            user_id=current_user.id,
+            github_repo_id=r["id"],
+            full_name=r["full_name"],
+            name=r["name"],
+            description=r.get("description"),
+            language=r.get("language"),
+            stars=r.get("stargazers_count", 0),
+            is_private=r.get("private", False),
+        ))
+    await db.commit()
+    return {"synced": len(github_repos[:50])}
+
 
 @router.get("/my-repos")
 async def get_my_repos(
