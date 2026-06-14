@@ -181,7 +181,7 @@ export default function TrendingPage() {
           onClick={() => router.push("/")}
           className="text-lg font-bold text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
         >
-          DevPulse
+          RepoMind
         </button>
         <button
           onClick={() => router.push("/")}

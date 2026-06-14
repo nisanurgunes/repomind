@@ -324,11 +324,11 @@ export default function Dashboard() {
                   const [owner, name] = result.repo.split("/");
                   const badgeUrl = `http://localhost:8000/api/repos/${owner}/${name}/badge`;
                   const scoreUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/score/${owner}/${name}`;
-                  const markdown = `[![DevPulse Score](${badgeUrl})](${scoreUrl})`;
+                  const markdown = `[![RepoMind Score](${badgeUrl})](${scoreUrl})`;
                   return (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 mb-2">
-                        <img src={badgeUrl} alt="DevPulse badge" />
+                        <img src={badgeUrl} alt="RepoMind badge" />
                       </div>
                       <div className="flex items-center gap-2">
                         <code className="flex-1 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-nowrap">

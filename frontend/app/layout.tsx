@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DevPulse — GitHub Repo Sağlık Analizi",
+  title: "RepoMind — GitHub Repo Sağlık Analizi",
   description: "GitHub repolarınızın commit, issue, PR ve contributor metriklerini analiz edin. 0-100 sağlık skoru.",
 };
 

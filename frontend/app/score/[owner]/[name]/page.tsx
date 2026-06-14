@@ -110,7 +110,7 @@ export default function ScoreCardPage() {
       {/* Navbar */}
       <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
         <button onClick={() => router.push("/")} className="text-lg font-bold text-gray-900 dark:text-white">
-          DevPulse
+          RepoMind
         </button>
         <button
           onClick={() => router.push("/")}
@@ -154,7 +154,7 @@ export default function ScoreCardPage() {
                   <p className={`text-2xl font-bold mb-1 ${data.health_score >= 80 ? "text-green-600" : data.health_score >= 60 ? "text-yellow-500" : "text-red-500"}`}>
                     {scoreLabel}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">DevPulse Sağlık Skoru</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">RepoMind Sağlık Skoru</p>
                   {data.analyzed_at && (
                     <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">{formatDate(data.analyzed_at)}</p>
                   )}
@@ -197,7 +197,7 @@ export default function ScoreCardPage() {
           </div>
 
           <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-4">
-            DevPulse ile oluşturuldu · devpulse.app
+            RepoMind ile oluşturuldu · devpulse.app
           </p>
         </div>
       </main>

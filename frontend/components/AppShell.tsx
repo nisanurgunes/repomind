@@ -104,7 +104,7 @@ export default function AppShell({ children, hideSidebar }: AppShellProps) {
             onClick={() => router.push("/dashboard")}
             className="text-lg font-bold text-gray-900 dark:text-white mr-3 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
           >
-            DevPulse
+            RepoMind
           </button>
 
           {/* Nav items */}
@@ -155,15 +155,4 @@ export default function AppShell({ children, hideSidebar }: AppShellProps) {
             }`}
           >
             <div className="w-64 overflow-y-auto h-full">
-              <WatchlistSidebar />
-            </div>
-          </aside>
-        )}
-
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
-}
+              <Watc

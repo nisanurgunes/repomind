@@ -186,7 +186,7 @@ function buildDoc(feature: FeatureDef): Document {
           children: [new Paragraph({
             border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '2E75B6', space: 1 } },
             children: [
-              new TextRun({ text: 'DevPulse — Teknik Dokümantasyon', size: 18, font: 'Arial', color: '666666' }),
+              new TextRun({ text: 'RepoMind — Teknik Dokümantasyon', size: 18, font: 'Arial', color: '666666' }),
               new TextRun({ text: `\t${feature.title}`, size: 18, font: 'Arial', color: '2E75B6' }),
             ],
             tabStops: [{ type: 'right' as const, position: 8640 }],
@@ -497,7 +497,7 @@ export const FEATURES: Record<string, FeatureDef> = {
   'github-oauth': {
     title: 'GitHub OAuth ve Kimlik Doğrulama',
     subtitle: 'GitHub OAuth 2.0 ile güvenli giriş ve JWT token yönetimi.',
-    overview: "DevPulse, kullanıcı kimliğini doğrulamak için GitHub OAuth 2.0 akışını kullanır. Giriş yapıldığında kullanıcı bilgileri veritabanına kaydedilir, GitHub erişim tokeni saklanır ve kısa ömürlü JWT ile oturum yönetilir.",
+    overview: "RepoMind, kullanıcı kimliğini doğrulamak için GitHub OAuth 2.0 akışını kullanır. Giriş yapıldığında kullanıcı bilgileri veritabanına kaydedilir, GitHub erişim tokeni saklanır ve kısa ömürlü JWT ile oturum yönetilir.",
     howItWorks: [
       "Kullanıcı 'GitHub ile Giriş Yap' butonuna tıklar.",
       "Backend, kullanıcıyı GitHub OAuth authorize sayfasına yönlendirir (scope: read:user, user:email, repo).",
