@@ -586,7 +586,7 @@ export async function GET(req: NextRequest) {
     const doc = buildDoc(FEATURES[key]);
     const buffer = await Packer.toBuffer(doc);
     const filename = `devpulse-${key}.docx`;
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'Content-Disposition': `attachment; filename="${filename}"`,
@@ -603,7 +603,7 @@ export async function GET(req: NextRequest) {
     zip.file(`${key}.docx`, buffer);
   }
   const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-  return new NextResponse(zipBuffer, {
+  return new NextResponse(new Uint8Array(zipBuffer), {
     headers: {
       'Content-Type': 'application/zip',
       'Content-Disposition': 'attachment; filename="devpulse-docs.zip"',

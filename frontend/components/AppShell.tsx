@@ -155,4 +155,16 @@ export default function AppShell({ children, hideSidebar }: AppShellProps) {
             }`}
           >
             <div className="w-64 overflow-y-auto h-full">
-              <Watc
+              <WatchlistSidebar />
+            </div>
+          </aside>
+        )}
+
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
