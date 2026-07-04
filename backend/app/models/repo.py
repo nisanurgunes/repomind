@@ -138,6 +138,22 @@ class SavedFeature(Base):
     user: Mapped["User"] = relationship()
 
 
+class UsageEvent(Base):
+    """AI-tüketen bir özellik her çağrıldığında kaydedilir — org denetim görünürlüğü
+    ve geçmişe dönük analiz için. Anlık kota kontrolü Redis sayaçlarıyla yapılır,
+    bu tablo yalnızca denetim/görünürlük amaçlıdır."""
+    __tablename__ = "usage_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), index=True)
+    org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
+    feature: Mapped[str] = mapped_column(String(50))
+    repo_full_name: Mapped[str | None] = mapped_column(String(511), nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    user: Mapped["User"] = relationship()
+
+
 class AnalysisJob(Base):
     __tablename__ = "analysis_jobs"
 

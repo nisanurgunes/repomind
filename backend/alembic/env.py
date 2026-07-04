@@ -8,8 +8,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.core.config import settings
 from app.core.database import Base
-from app.models.user import User
-from app.models.repo import Repo, RepoSnapshot, Watchlist, Dependency, AnalysisJob
+from app.models.user import (
+    User, Organization, OrganizationMember, OrgInvite, Subscription,
+)
+from app.models.repo import (
+    Repo, RepoSnapshot, Watchlist, Dependency, AnalysisJob, UsageEvent,
+)
 
 config = context.config
 

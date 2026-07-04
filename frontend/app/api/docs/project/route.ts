@@ -80,15 +80,21 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const owner = searchParams.get('owner');
   const name = searchParams.get('name');
+  const authHeader = req.headers.get('authorization');
 
   if (!owner || !name) {
     return NextResponse.json({ error: "owner ve name parametreleri gerekli." }, { status: 400 });
   }
+  if (!authHeader) {
+    return NextResponse.json({ detail: "Giriş yapmalısınız." }, { status: 401 });
+  }
 
-  const backendRes = await fetch(`${BASE}/repos/${owner}/${name}/project-doc`);
+  const backendRes = await fetch(`${BASE}/repos/${owner}/${name}/project-doc`, {
+    headers: { Authorization: authHeader },
+  });
   if (!backendRes.ok) {
     const err = await backendRes.json().catch(() => ({ detail: 'Doküman oluşturulamadı.' }));
-    return NextResponse.json({ error: err.detail ?? 'Doküman oluşturulamadı.' }, { status: backendRes.status });
+    return NextResponse.json(err, { status: backendRes.status });
   }
 
   const data: ProjectDocResponse = await backendRes.json();

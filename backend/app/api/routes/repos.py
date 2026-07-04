@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
+from app.core.auth import get_current_user
+from app.core.billing import BillingContext, require_chat_quota, require_generation_quota
 from app.core.database import get_db
-from app.models.repo import Repo, RepoSnapshot
+from app.models.repo import Repo, RepoSnapshot, UsageEvent
+from app.models.user import User
 from app.services.github import GithubService
 from app.services.health_score import HealthScoreEngine
 from app.services.readme_parser import parse_readme
@@ -330,7 +333,14 @@ async def get_contributors_analysis(owner: str, name: str):
 
 
 @router.post("/{owner}/{name}/advisor-chat")
-async def advisor_chat(owner: str, name: str, body: dict):
+async def advisor_chat(
+    owner: str,
+    name: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    billing_ctx: BillingContext = Depends(require_chat_quota),
+):
     """
     Repo bağlamını bilen ürün danışmanı AI ile serbest chat.
     body: { messages: [{role, content}], repo_context: {description, language, topics, readme_excerpt} }
@@ -381,13 +391,26 @@ Görevin:
             system=system_prompt,
             messages=messages,
         )
+        db.add(UsageEvent(
+            user_id=current_user.id,
+            org_id=billing_ctx.org.id if billing_ctx.org else None,
+            feature="advisor_chat",
+            repo_full_name=f"{owner}/{name}",
+        ))
+        await db.commit()
         return {"reply": response.content[0].text}
     except Exception:
         raise HTTPException(status_code=500, detail="Yanıt alınamadı. Tekrar deneyin.")
 
 
 @router.get("/{owner}/{name}/project-analysis")
-async def get_project_analysis(owner: str, name: str):
+async def get_project_analysis(
+    owner: str,
+    name: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    billing_ctx: BillingContext = Depends(require_generation_quota),
+):
     """
     Kullanıcının kendi projesini derin analiz eder:
     - Kod yapısı, README, config dosyaları
@@ -513,7 +536,15 @@ SADECE JSON formatında yanıt ver:
         end = raw.rfind("}") + 1
         if start == -1 or end == 0:
             raise ValueError("JSON bulunamadı")
-        return json.loads(raw[start:end])
+        result = json.loads(raw[start:end])
+        db.add(UsageEvent(
+            user_id=current_user.id,
+            org_id=billing_ctx.org.id if billing_ctx.org else None,
+            feature="project_analysis",
+            repo_full_name=f"{owner}/{name}",
+        ))
+        await db.commit()
+        return result
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Analiz tamamlanamadı. Lütfen tekrar deneyin.")
     except Exception as e:
@@ -521,7 +552,13 @@ SADECE JSON formatında yanıt ver:
 
 
 @router.get("/{owner}/{name}/feature-gap")
-async def get_feature_gap(owner: str, name: str):
+async def get_feature_gap(
+    owner: str,
+    name: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    billing_ctx: BillingContext = Depends(require_generation_quota),
+):
     """
     Verilen repoya benzer projeleri bul, README'lerini analiz et ve
     'onlarda var, sende yok' feature önerileri üret.
@@ -653,7 +690,15 @@ SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
         end = raw.rfind("}") + 1
         if start == -1 or end == 0:
             raise ValueError("JSON bulunamadı")
-        return json.loads(raw[start:end])
+        result = json.loads(raw[start:end])
+        db.add(UsageEvent(
+            user_id=current_user.id,
+            org_id=billing_ctx.org.id if billing_ctx.org else None,
+            feature="feature_gap",
+            repo_full_name=f"{owner}/{name}",
+        ))
+        await db.commit()
+        return result
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Analiz tamamlanamadı. Lütfen tekrar deneyin.")
     except Exception:
@@ -661,7 +706,13 @@ SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
 
 
 @router.get("/{owner}/{name}/project-doc")
-async def get_project_doc(owner: str, name: str):
+async def get_project_doc(
+    owner: str,
+    name: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    billing_ctx: BillingContext = Depends(require_generation_quota),
+):
     """
     Projenin mevcut (zaten var olan) özelliklerini, teknoloji yığınını ve
     varsa API endpoint'lerini tespit eder. Feature Gap / Proje Analizi'nin
@@ -765,6 +816,13 @@ SADECE JSON formatında yanıt ver:
         "language": repo_data.get("language"),
         "stars": repo_data.get("stargazers_count", 0),
     }
+    db.add(UsageEvent(
+        user_id=current_user.id,
+        org_id=billing_ctx.org.id if billing_ctx.org else None,
+        feature="project_doc",
+        repo_full_name=f"{owner}/{name}",
+    ))
+    await db.commit()
     return data
 
 

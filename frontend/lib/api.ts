@@ -5,6 +5,22 @@ function getToken() {
   return localStorage.getItem("devpulse_token");
 }
 
+export class QuotaExceededError extends Error {
+  feature: string;
+  limit: number;
+  ownerType: string;
+  upgradeUrl: string;
+
+  constructor(feature: string, limit: number, ownerType: string, upgradeUrl: string) {
+    super("Kullanım limitine ulaşıldı");
+    this.name = "QuotaExceededError";
+    this.feature = feature;
+    this.limit = limit;
+    this.ownerType = ownerType;
+    this.upgradeUrl = upgradeUrl;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -16,6 +32,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Hata oluştu" }));
+    if (res.status === 402 && err.error === "quota_exceeded") {
+      throw new QuotaExceededError(err.feature, err.limit, err.owner_type, err.upgrade_url ?? "/pricing");
+    }
     throw new Error(err.detail ?? "Hata oluştu");
   }
   return res.json();
@@ -104,4 +123,20 @@ export const api = {
 
   updateMemberRole: (slug: string, userId: number, role: string) =>
     request<any>(`/orgs/${slug}/members/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
+
+  // Billing
+  createCheckoutSession: (plan: "personal_pro" | "org_pro", orgSlug?: string) =>
+    request<{ checkout_url: string }>(`/billing/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ plan, org_slug: orgSlug }),
+    }),
+
+  createPortalSession: (orgSlug?: string) =>
+    request<{ portal_url: string }>(`/billing/portal`, {
+      method: "POST",
+      body: JSON.stringify({ org_slug: orgSlug }),
+    }),
+
+  getBillingStatus: (orgSlug?: string) =>
+    request<any>(`/billing/status${orgSlug ? `?org_slug=${encodeURIComponent(orgSlug)}` : ""}`),
 };

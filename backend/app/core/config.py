@@ -25,9 +25,14 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
-    # Lemon Squeezy
-    LEMONSQUEEZY_API_KEY: Optional[str] = None
-    LEMONSQUEEZY_WEBHOOK_SECRET: Optional[str] = None
+    # Stripe
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_PRICE_ID_PERSONAL_PRO: Optional[str] = None
+    STRIPE_PRICE_ID_ORG_PRO: Optional[str] = None
+
+    # Frontend
+    FRONTEND_URL: str = "http://localhost:3000"
 
     class Config:
         env_file = ".env"

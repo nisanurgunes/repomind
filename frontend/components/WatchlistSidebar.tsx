@@ -24,9 +24,13 @@ export default function WatchlistSidebar() {
   const router = useRouter();
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [featureCounts, setFeatureCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getWatchlist().then((data) => setWatchlist(data.watchlist || [])).catch(() => {});
+    api.getWatchlist()
+      .then((data) => setWatchlist(data.watchlist || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
     api.getFeatureCounts().then((data) => setFeatureCounts(data.counts || {})).catch(() => {});
   }, []);
 
@@ -40,7 +44,16 @@ export default function WatchlistSidebar() {
       <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
         Takip Listesi
       </p>
-      {watchlist.length === 0 ? (
+      {loading ? (
+        <ul className="space-y-1">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="px-3 py-2.5">
+              <div className="h-3.5 w-2/3 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+              <div className="h-2.5 w-1/3 rounded bg-gray-100 dark:bg-gray-800 animate-pulse mt-2" />
+            </li>
+          ))}
+        </ul>
+      ) : watchlist.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-sm text-gray-400 dark:text-gray-600">Henüz repo yok.</p>
           <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">Analiz et ve kaydet.</p>

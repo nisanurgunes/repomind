@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { api, QuotaExceededError } from "@/lib/api";
 import AppShell from "@/components/AppShell";
+import UpgradePrompt from "@/components/UpgradePrompt";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -200,6 +201,7 @@ function CompareTab() {
   const [saved, setSaved] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState<number | null>(null);
   const [page, setPage] = useState(1);
+  const [quotaError, setQuotaError] = useState<QuotaExceededError | null>(null);
 
   useEffect(() => {
     api.getWatchlist().then((d) => setWatchlist(d.watchlist || [])).catch(() => {});
@@ -235,7 +237,8 @@ function CompareTab() {
       const data = await api.getFeatureGap(owner, name);
       setResult(data);
     } catch (e: any) {
-      setError(e.message || "Analiz sırasında hata oluştu.");
+      if (e instanceof QuotaExceededError) setQuotaError(e);
+      else setError(e.message || "Analiz sırasında hata oluştu.");
     } finally {
       clearTimeout(t1); clearTimeout(t2);
       setLoading(false); setStep("idle");
@@ -251,6 +254,7 @@ function CompareTab() {
 
   return (
     <div>
+      {quotaError && <UpgradePrompt error={quotaError} onClose={() => setQuotaError(null)} />}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 mb-6">
         <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
           Karşılaştırılacak repo
@@ -399,6 +403,7 @@ function AnalyzeTab() {
   const [saved, setSaved] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState<number | null>(null);
   const [repoSource, setRepoSource] = useState<"mine" | "watchlist">("mine");
+  const [quotaError, setQuotaError] = useState<QuotaExceededError | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [page, setPage] = useState(1);
 
@@ -450,7 +455,8 @@ function AnalyzeTab() {
       const data = await api.getProjectAnalysis(owner, name);
       setResult(data);
     } catch (e: any) {
-      setError(e.message || "Analiz sırasında hata oluştu.");
+      if (e instanceof QuotaExceededError) setQuotaError(e);
+      else setError(e.message || "Analiz sırasında hata oluştu.");
     } finally {
       clearTimeout(t1); clearTimeout(t2);
       setLoading(false); setStep("idle");
@@ -473,6 +479,7 @@ function AnalyzeTab() {
 
   return (
     <div>
+      {quotaError && <UpgradePrompt error={quotaError} onClose={() => setQuotaError(null)} />}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 mb-6">
         <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
           Analiz edilecek proje
@@ -690,6 +697,7 @@ function AdvisorTab() {
   const [sending, setSending] = useState(false);
   const [repoSource, setRepoSource] = useState<"mine" | "watchlist">("mine");
   const bottomRef = useState<HTMLDivElement | null>(null);
+  const [quotaError, setQuotaError] = useState<QuotaExceededError | null>(null);
   // Session içi analiz cache — geri gelince tekrar analiz yapma
   const analysisCache = useRef<Record<string, { context: object; messages: ChatMessage[] }>>({});
 
@@ -794,8 +802,9 @@ function AdvisorTab() {
         repoContext || {}
       );
       setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
-    } catch {
-      setMessages(prev => [...prev, { role: "assistant", content: "Bir hata oluştu. Tekrar deneyin." }]);
+    } catch (e: any) {
+      if (e instanceof QuotaExceededError) setQuotaError(e);
+      else setMessages(prev => [...prev, { role: "assistant", content: "Bir hata oluştu. Tekrar deneyin." }]);
     }
     setSending(false);
   };
@@ -854,6 +863,7 @@ function AdvisorTab() {
 
   return (
     <div className="flex flex-col" style={{ height: "calc(100vh - 280px)", minHeight: "500px" }}>
+      {quotaError && <UpgradePrompt error={quotaError} onClose={() => setQuotaError(null)} />}
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">

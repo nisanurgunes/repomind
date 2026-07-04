@@ -21,6 +21,7 @@ class User(Base):
     plan: Mapped[PlanType] = mapped_column(
         Enum(PlanType), default=PlanType.free
     )
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -69,6 +70,8 @@ class Organization(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    plan: Mapped[PlanType] = mapped_column(Enum(PlanType), default=PlanType.free)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -108,3 +111,39 @@ class OrgInvite(Base):
 
     org: Mapped["Organization"] = relationship(back_populates="invites")
     inviter: Mapped["User"] = relationship(foreign_keys=[invited_by])
+
+
+class BillingOwnerType(str, enum.Enum):
+    user = "user"
+    organization = "organization"
+
+
+class SubscriptionStatus(str, enum.Enum):
+    active = "active"
+    past_due = "past_due"
+    canceled = "canceled"
+    incomplete = "incomplete"
+
+
+class Subscription(Base):
+    """Bir kullanıcının veya organizasyonun Stripe aboneliği — owner_type'a göre
+    user_id veya org_id'den yalnızca biri dolu olur. `plan` alanı (User/Organization
+    üzerinde) webhook tarafından bu kayıtla senkron tutulan hızlı-okuma cache'idir."""
+    __tablename__ = "subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_type: Mapped[BillingOwnerType] = mapped_column(Enum(BillingOwnerType))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"), nullable=True, index=True)
+    org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
+    stripe_subscription_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    stripe_price_id: Mapped[str] = mapped_column(String(255))
+    status: Mapped[SubscriptionStatus] = mapped_column(Enum(SubscriptionStatus))
+    current_period_end: Mapped[DateTime] = mapped_column(DateTime(timezone=True))
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship()
+    org: Mapped["Organization"] = relationship()

@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.api.routes import repos, users, auth, notifications, orgs, features
+from app.core.billing import QuotaExceededError
+from app.api.routes import repos, users, auth, notifications, orgs, features, billing
 
 
 @asynccontextmanager
@@ -39,6 +41,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(QuotaExceededError)
+async def quota_exceeded_handler(request: Request, exc: QuotaExceededError):
+    return JSONResponse(
+        status_code=402,
+        content={
+            "error": "quota_exceeded",
+            "feature": exc.feature_kind,
+            "limit": exc.limit,
+            "owner_type": exc.owner_type,
+            "upgrade_url": "/pricing",
+        },
+    )
+
 # Routes
 app.include_router(repos.router, prefix="/api/repos", tags=["repos"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
@@ -46,6 +61,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(orgs.router, prefix="/api/orgs", tags=["orgs"])
 app.include_router(features.router, prefix="/api/features", tags=["features"])
+app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
 
 @app.get("/")
 async def root():
