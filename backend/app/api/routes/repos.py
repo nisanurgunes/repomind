@@ -660,6 +660,114 @@ SADECE JSON formatında yanıt ver, başka hiçbir şey yazma:
         raise HTTPException(status_code=500, detail="Analiz sırasında bir hata oluştu. Lütfen tekrar deneyin.")
 
 
+@router.get("/{owner}/{name}/project-doc")
+async def get_project_doc(owner: str, name: str):
+    """
+    Projenin mevcut (zaten var olan) özelliklerini, teknoloji yığınını ve
+    varsa API endpoint'lerini tespit eder. Feature Gap / Proje Analizi'nin
+    aksine eksik değil, VAR OLAN işlevleri döndürür — sunum/yatırımcı
+    dokümanı üretmek için kullanılır.
+    """
+    import anthropic, os, json
+
+    github = GithubService()
+
+    try:
+        repo_data = await github.get_repo(owner, name)
+        readme = await github.get_readme_content(owner, name) or ""
+        file_tree = await github.get_file_tree(owner, name)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"GitHub API hatası: {str(e)}")
+
+    key_files_content = {}
+    key_file_candidates = [
+        f for f in file_tree
+        if any(f.endswith(ext) for ext in [
+            "package.json", "pyproject.toml", "requirements.txt",
+            "Dockerfile", "docker-compose.yml", "Makefile",
+            "go.mod", "Cargo.toml", "pom.xml",
+        ])
+    ]
+    for path in key_file_candidates[:5]:
+        content = await github.get_file_content(owner, name, path)
+        if content:
+            key_files_content[path] = content
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY eksik.")
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    file_tree_str = "\n".join(file_tree[:80]) if file_tree else "Bilgi yok"
+    key_files_str = "\n\n".join([f"### {p}\n{c}" for p, c in key_files_content.items()]) or "Yok"
+
+    prompt = f"""Sen bir teknik yazarsın. Aşağıdaki GitHub projesini, bu projeyi hiç bilmeyen birine (ör. bir yatırımcıya veya iş ortağına) sunmak için dokümante edeceksin.
+
+## Proje: {owner}/{name}
+Açıklama: {repo_data.get('description') or 'Yok'}
+Dil: {repo_data.get('language') or 'Bilinmiyor'}
+Topics: {', '.join(repo_data.get('topics', [])) or 'Yok'}
+Stars: {repo_data.get('stargazers_count', 0):,}
+
+## Dosya Yapısı:
+{file_tree_str}
+
+## Önemli Dosyalar:
+{key_files_str}
+
+## README:
+{readme[:4000]}
+
+---
+
+Görevin: SADECE bu projede HALİHAZIRDA VAR OLAN özellikleri ve teknik yapıyı çıkar. Eksik/önerilecek şeyleri değil, mevcut olanı anlat.
+
+Kurallar:
+- "features" listesi README, dosya yapısı ve kod dosyalarından net şekilde anlaşılan gerçek işlevler olmalı. Var olduğuna emin olmadığın bir şeyi uydurma.
+- "endpoints" sadece README'de açıkça dokümante edilmişse veya dosya yapısından (route/controller dosya adlarından) net şekilde çıkarılabiliyorsa doldur. Emin değilsen boş liste döndür — endpoint uydurma.
+- "tech_stack" key dosyalardan (package.json, requirements.txt vb.) ve dosya uzantılarından objektif olarak çıkar.
+
+SADECE JSON formatında yanıt ver:
+{{
+  "tagline": "Projeyi tek cümlede özetleyen çarpıcı bir başlık (max 15 kelime)",
+  "overview": "Projenin ne yaptığı, kimin için olduğu — 3-4 cümlelik yönetici özeti",
+  "tech_stack": [["Katman", "Teknoloji / Detay"]],
+  "features": [
+    {{"title": "Kısa başlık (max 6 kelime)", "description": "Bu özellik ne yapar, kullanıcıya ne kazandırır (2-3 cümle)"}}
+  ],
+  "endpoints": [
+    {{"method": "GET|POST|PUT|PATCH|DELETE", "path": "/...", "desc": "Kısa açıklama"}}
+  ],
+  "highlights": ["Öne çıkan, satış konuşmasında kullanılabilecek madde"]
+}}"""
+
+    try:
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = message.content[0].text.strip()
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start == -1 or end == 0:
+            raise ValueError("JSON bulunamadı")
+        data = json.loads(raw[start:end])
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Doküman oluşturulamadı. Lütfen tekrar deneyin.")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Doküman oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.")
+
+    data["repo"] = {
+        "full_name": repo_data.get("full_name", f"{owner}/{name}"),
+        "description": repo_data.get("description"),
+        "language": repo_data.get("language"),
+        "stars": repo_data.get("stargazers_count", 0),
+    }
+    return data
+
+
 @router.get("/{owner}/{name}")
 async def get_repo(owner: str, name: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(

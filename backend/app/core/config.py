@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     GITHUB_TOKEN: Optional[str] = None
 
+    # Anthropic AI
+    ANTHROPIC_API_KEY: Optional[str] = None
+
     # JWT
     SECRET_KEY: str = "change-me-in-production"
     ALGORITHM: str = "HS256"
@@ -28,5 +31,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # .env'de model'de tanımlı olmayan bir anahtar varsa boot'u kırmasın
 
 settings = Settings()

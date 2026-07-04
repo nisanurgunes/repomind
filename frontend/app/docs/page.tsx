@@ -1,19 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { FEATURE_DOCS } from "@/lib/featureDocs";
 
-const FEATURES = [
-  { key: "repo-saglik-skoru",       label: "Repo Sağlık Skoru",                 icon: "🏥", desc: "0–100 arası ağırlıklı puan motoru" },
-  { key: "feature-gap-analizi",     label: "Feature Gap Analizi",               icon: "🔍", desc: "Benzer projelerle karşılaştırma, eksik özellik tespiti" },
-  { key: "kendi-projeyi-analiz-et", label: "Kendi Projeyi Analiz Et",           icon: "🤖", desc: "AI destekli kişiselleştirilmiş geliştirme önerileri" },
-  { key: "danisman-advisor-chat",   label: "Danışman (Advisor Chat)",           icon: "💬", desc: "Repo bağlamını bilen AI ile serbest danışmanlık" },
-  { key: "ekip-analizi",            label: "Ekip Analizi",                       icon: "👥", desc: "Contributor aktivitesi, commit heatmap, PR metrikleri" },
-  { key: "kaydedilen-feature-onerileri", label: "Kaydedilen Feature Önerileri", icon: "📌", desc: "Önerileri backlog olarak yönet, statü takibi" },
-  { key: "bildirim-sistemi",        label: "Bildirim Sistemi",                   icon: "🔔", desc: "Commit, skor düşüşü ve PR bildirimleri" },
-  { key: "organizasyon-yonetimi",   label: "Organizasyon Yönetimi",             icon: "🏢", desc: "Takım oluştur, üye davet et, ortak dashboard" },
-  { key: "github-oauth",            label: "GitHub OAuth ve Kimlik Doğrulama",  icon: "🔐", desc: "OAuth 2.0 akışı, JWT yönetimi, UUID kullanıcı kimlikleri" },
-  { key: "paylasilabilir-skor-karti", label: "Paylaşılabilir Skor Kartı & Badge", icon: "🏅", desc: "Public link ve SVG badge üretimi" },
-];
+const FEATURES = Object.entries(FEATURE_DOCS).map(([key, f]) => ({
+  key,
+  label: f.title,
+  icon: f.icon,
+  desc: f.listDesc,
+}));
 
 export default function DocsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
