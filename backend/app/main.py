@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.billing import QuotaExceededError
-from app.api.routes import repos, users, auth, notifications, orgs, features, billing
+from app.api.routes import repos, users, auth, notifications, orgs, features, billing, admin
 
 
 @asynccontextmanager
@@ -62,6 +62,7 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(orgs.router, prefix="/api/orgs", tags=["orgs"])
 app.include_router(features.router, prefix="/api/features", tags=["features"])
 app.include_router(billing.router, prefix="/api/billing", tags=["billing"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 @app.get("/")
 async def root():

@@ -41,6 +41,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  getMe: () => request<any>(`/users/me`),
+
   analyzeRepo: (owner: string, name: string) =>
     request<any>(`/repos/analyze?owner=${owner}&name=${name}`, { method: "POST" }),
 
@@ -139,4 +141,13 @@ export const api = {
 
   getBillingStatus: (orgSlug?: string) =>
     request<any>(`/billing/status${orgSlug ? `?org_slug=${encodeURIComponent(orgSlug)}` : ""}`),
+
+  // Admin
+  listAllUsers: () => request<{ users: any[] }>(`/admin/users`),
+
+  impersonateUser: (userId: string) =>
+    request<{ token: string; user: { id: string; email: string; name: string } }>(
+      `/admin/impersonate/${userId}`,
+      { method: "POST" }
+    ),
 };

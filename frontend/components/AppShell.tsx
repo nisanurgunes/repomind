@@ -65,13 +65,23 @@ export default function AppShell({ children, hideSidebar }: AppShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isImpersonating, setIsImpersonating] = useState(false);
 
   // Mount öncesi sidebar render edilmez — flash önlenir
   useEffect(() => {
     const saved = localStorage.getItem("devpulse_sidebar");
     setSidebarOpen(saved === null ? true : saved === "true");
+    setIsImpersonating(!!localStorage.getItem("devpulse_admin_token"));
     setMounted(true);
   }, []);
+
+  const returnToAdmin = () => {
+    const adminToken = localStorage.getItem("devpulse_admin_token");
+    if (!adminToken) return;
+    localStorage.setItem("devpulse_token", adminToken);
+    localStorage.removeItem("devpulse_admin_token");
+    router.push("/admin");
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen((prev) => {
@@ -132,6 +142,15 @@ export default function AppShell({ children, hideSidebar }: AppShellProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {isImpersonating && (
+            <button
+              onClick={returnToAdmin}
+              className="text-xs font-medium px-2.5 py-1.5 rounded-lg bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/60 transition-colors"
+              title="Kendi admin hesabına dön"
+            >
+              Adminime dön
+            </button>
+          )}
           <NotificationBell />
           <button
             onClick={() => router.push("/settings")}
@@ -147,6 +166,7 @@ export default function AppShell({ children, hideSidebar }: AppShellProps) {
           <button
             onClick={() => {
               localStorage.removeItem("devpulse_token");
+              localStorage.removeItem("devpulse_admin_token");
               router.push("/");
             }}
             className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
