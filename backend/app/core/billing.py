@@ -5,8 +5,10 @@ organizasyonun paylaşılan havuzundan düşer (org_slug ile açıkça belirtile
 belirtilmezse en son katılınan Pro org varsayılan olur). Değilse kişisel
 plan/kota kullanılır.
 """
+import logging
 from datetime import datetime, timezone
 
+import redis.exceptions
 from fastapi import Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +18,8 @@ from app.core.database import get_db
 from app.core.quota_limits import get_limit
 from app.core.redis_client import get_redis
 from app.models.user import Organization, OrganizationMember, PlanType, User
+
+logger = logging.getLogger(__name__)
 
 QUOTA_TTL_SECONDS = 60 * 60 * 24 * 35  # ~35 gün, ayın en uzun haline göre güvenli marj
 
@@ -64,9 +68,42 @@ async def resolve_billing_context(
     return BillingContext("user", str(user.id), user.plan, None)
 
 
+async def check_and_consume_quota(feature_kind: str, ctx: BillingContext) -> bool:
+    """Redis sayacını artırır, limit aşılırsa QuotaExceededError fırlatır.
+    `require_ai_quota` dependency'sinin ve HTTP dışı çağıranların (örn. /analyze
+    sonundaki fire-and-forget indeksleme tetiklemesi) ortak kullandığı çekirdek
+    mantık. Kota sınırsızsa (limit=None) True döner, sayaç işletilmez.
+
+    Redis'e ulaşılamıyorsa (yanlış yapılandırma, geçici kesinti) kota kontrolü
+    "fail open" davranır: uyarı loglanır ve istek geçirilir. Kota uygulaması
+    ikincil bir iş kuralıdır — Redis'in çökmesi asıl AI endpoint'lerini
+    kilitlememeli."""
+    limit = get_limit(feature_kind, ctx.plan, is_org=(ctx.owner_type == "org"))
+    if limit is None:
+        return True
+    try:
+        redis_client = get_redis()
+        month_key = datetime.now(timezone.utc).strftime("%Y-%m")
+        key = f"quota:{ctx.owner_type}:{ctx.owner_id}:{feature_kind}:{month_key}"
+        count = await redis_client.incr(key)
+        if count == 1:
+            await redis_client.expire(key, QUOTA_TTL_SECONDS)
+    except redis.exceptions.RedisError:
+        logger.warning(
+            "Kota kontrolü için Redis'e ulaşılamadı — istek kota uygulanmadan geçiriliyor "
+            "(feature=%s, owner=%s:%s)",
+            feature_kind, ctx.owner_type, ctx.owner_id,
+        )
+        return True
+    if count > limit:
+        raise QuotaExceededError(feature_kind, limit, ctx.owner_type)
+    return True
+
+
 def require_ai_quota(feature_kind: str):
     """`feature_kind`: "generation" (project-analysis/feature-gap/project-doc,
-    ortak havuz) veya "chat_message" (advisor-chat, mesaj başına sayılır)."""
+    ortak havuz), "chat_message" (advisor-chat/ask-repo, mesaj başına sayılır)
+    veya "indexing" (doküman indeksleme, ayrı ve daha sıkı havuz)."""
 
     async def _dep(
         current_user: User = Depends(get_current_user),
@@ -74,16 +111,7 @@ def require_ai_quota(feature_kind: str):
         org_slug: str | None = Query(None),
     ) -> BillingContext:
         ctx = await resolve_billing_context(current_user, db, org_slug)
-        limit = get_limit(feature_kind, ctx.plan, is_org=(ctx.owner_type == "org"))
-        if limit is not None:
-            redis_client = get_redis()
-            month_key = datetime.now(timezone.utc).strftime("%Y-%m")
-            key = f"quota:{ctx.owner_type}:{ctx.owner_id}:{feature_kind}:{month_key}"
-            count = await redis_client.incr(key)
-            if count == 1:
-                await redis_client.expire(key, QUOTA_TTL_SECONDS)
-            if count > limit:
-                raise QuotaExceededError(feature_kind, limit, ctx.owner_type)
+        await check_and_consume_quota(feature_kind, ctx)
         return ctx
 
     return _dep
@@ -91,3 +119,4 @@ def require_ai_quota(feature_kind: str):
 
 require_generation_quota = require_ai_quota("generation")
 require_chat_quota = require_ai_quota("chat_message")
+require_indexing_quota = require_ai_quota("indexing")
