@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FEATURE_DOCS } from "@/lib/featureDocs";
+import AppShell from "@/components/AppShell";
 
 const FEATURES = Object.entries(FEATURE_DOCS).map(([key, f]) => ({
   key,
@@ -58,6 +59,7 @@ export default function DocsPage() {
   const isLoading = loading !== null;
 
   return (
+    <AppShell>
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-10 px-4">
       <div className="max-w-3xl mx-auto">
 
@@ -169,5 +171,6 @@ export default function DocsPage() {
         </p>
       </div>
     </div>
+    </AppShell>
   );
 }
