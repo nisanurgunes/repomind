@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { loadGithubConfig, startGithubLogin } from "@/lib/githubLogin";
 
 const GH_ICON = (
   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -145,13 +144,36 @@ const TAG_COLORS: Record<string, string> = {
 
 export default function LandingPage() {
   const router = useRouter();
+  const [loginState, setLoginState] = useState<"idle" | "redirecting" | "error">("idle");
 
   useEffect(() => {
-    if (localStorage.getItem("devpulse_token")) router.replace("/dashboard");
+    if (localStorage.getItem("devpulse_token")) {
+      router.replace("/dashboard");
+      return;
+    }
+    // Config'i önceden al; Render free'de uyuyan backend de bu sırada uyanır
+    loadGithubConfig().catch(() => {});
   }, [router]);
+
+  async function handleLogin() {
+    if (loginState === "redirecting") return;
+    setLoginState("redirecting");
+    try {
+      await startGithubLogin();
+    } catch {
+      setLoginState("error");
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#080b14] text-white">
+      {loginState !== "idle" && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] rounded-lg border border-white/10 bg-gray-900/95 px-4 py-2.5 text-sm text-gray-200 shadow-lg">
+          {loginState === "redirecting"
+            ? "GitHub'a yönlendiriliyor..."
+            : "Giriş başlatılamadı. Biraz sonra tekrar dene."}
+        </div>
+      )}
 
       {/* ── Navbar ── */}
       <nav className="sticky top-0 z-50 border-b border-white/8 bg-[#080b14]/80 backdrop-blur-md">
@@ -164,13 +186,14 @@ export default function LandingPage() {
           <div className="flex items-center gap-5">
             <a href="/trending" className="text-sm text-gray-400 hover:text-white transition-colors hidden sm:inline">Trending</a>
             <a href="/docs" className="text-sm text-gray-400 hover:text-white transition-colors hidden sm:inline">Docs</a>
-            <a
-              href={`${API_URL}/api/auth/login`}
-              className="flex items-center gap-2 bg-white text-gray-900 hover:bg-gray-100 transition-colors px-4 py-2 rounded-lg text-sm font-semibold"
+            <button
+              type="button"
+              onClick={handleLogin}
+              className="flex items-center gap-2 bg-white text-gray-900 hover:bg-gray-100 transition-colors px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer"
             >
               {GH_ICON}
               GitHub ile Giriş Yap
-            </a>
+            </button>
           </div>
         </div>
       </nav>
@@ -202,13 +225,14 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center justify-center gap-3 flex-wrap">
-            <a
-              href={`${API_URL}/api/auth/login`}
-              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-xl text-base font-semibold shadow-lg shadow-violet-600/25"
+            <button
+              type="button"
+              onClick={handleLogin}
+              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-xl text-base font-semibold shadow-lg shadow-violet-600/25 cursor-pointer"
             >
               {GH_ICON}
               Ücretsiz Başla
-            </a>
+            </button>
             <a href="/trending" className="flex items-center gap-2 border border-white/15 hover:border-white/30 hover:bg-white/5 transition-all text-gray-300 px-7 py-3.5 rounded-xl text-base font-semibold">
               Trending'e Bak
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
@@ -370,13 +394,14 @@ export default function LandingPage() {
         <div className="relative max-w-xl mx-auto px-6 text-center">
           <h2 className="text-4xl font-bold mb-4">Reponu hemen analiz et</h2>
           <p className="text-gray-400 mb-8">GitHub hesabınla giriş yap, repo seç, AI analizini başlat. Ücretsiz.</p>
-          <a
-            href={`${API_URL}/api/auth/login`}
-            className="inline-flex items-center gap-2.5 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-8 py-4 rounded-xl text-base font-semibold shadow-lg shadow-violet-600/30"
+          <button
+            type="button"
+            onClick={handleLogin}
+            className="inline-flex items-center gap-2.5 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-8 py-4 rounded-xl text-base font-semibold shadow-lg shadow-violet-600/30 cursor-pointer"
           >
             {GH_ICON}
             GitHub ile Giriş Yap
-          </a>
+          </button>
         </div>
       </section>
 
@@ -390,7 +415,7 @@ export default function LandingPage() {
           <div className="flex gap-6">
             <a href="/trending" className="hover:text-gray-300 transition-colors">Trending</a>
             <a href="/docs" className="hover:text-gray-300 transition-colors">Dokümanlar</a>
-            <a href={`${API_URL}/api/auth/login`} className="hover:text-gray-300 transition-colors">Giriş Yap</a>
+            <button type="button" onClick={handleLogin} className="hover:text-gray-300 transition-colors cursor-pointer">Giriş Yap</button>
           </div>
           <p>GitHub repo analizi · 2025</p>
         </div>

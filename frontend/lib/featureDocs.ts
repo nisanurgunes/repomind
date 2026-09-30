@@ -350,14 +350,17 @@ export const FEATURE_DOCS: Record<string, FeatureDoc> = {
       ['Güvenlik', "GITHUB_CLIENT_SECRET .env'de saklanır, Git'e eklenmez"],
     ],
     endpoints: [
-      { method: 'GET', path: '/api/auth/login', desc: 'GitHub OAuth akışını başlatır.' },
-      { method: 'GET', path: '/api/auth/callback', desc: "GitHub'dan dönen code'u token'a çevirir, JWT üretir." },
+      { method: 'GET', path: '/api/auth/github/config', desc: "Frontend'in GitHub giriş adresini kurması için client_id, redirect_uri ve scope döner." },
+      { method: 'POST', path: '/api/auth/github/exchange', desc: "GitHub'dan frontend'e dönen code'u token'a çevirir, JWT döner." },
+      { method: 'GET', path: '/api/auth/login', desc: 'Eski akış: GitHub OAuth akışını backend üzerinden başlatır.' },
+      { method: 'GET', path: '/api/auth/callback', desc: "Eski akış: GitHub'dan backend'e dönen code'u token'a çevirir." },
     ],
     files: [
       { path: 'backend/app/api/routes/auth.py', desc: 'OAuth akışı ve repo senkronizasyonu' },
       { path: 'backend/app/core/auth.py', desc: 'JWT doğrulama middleware' },
       { path: 'backend/app/models/user.py', desc: 'User ve UserRepo modelleri' },
-      { path: "frontend/app/auth/callback/page.tsx", desc: "Token'ı localStorage'a kaydeden sayfa" },
+      { path: "frontend/lib/githubLogin.ts", desc: "GitHub'a yönlendirme, state (CSRF) kontrolü ve code takası" },
+      { path: "frontend/app/auth/callback/page.tsx", desc: "Code'u token'a çevirip localStorage'a kaydeden sayfa" },
     ],
     highlights: [
       'repo OAuth scope\'u sayesinde private repolar da listelenir.',
