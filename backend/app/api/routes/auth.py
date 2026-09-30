@@ -22,7 +22,7 @@ async def github_login():
     backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
     github_url = (
         f"{GITHUB_AUTH_URL}"
-        f"?client_id={settings.GITHUB_CLIENT_ID}"
+        f"?client_id={settings.GITHUB_CLIENT_ID.strip().strip(chr(34) + chr(39))}"
         f"&scope=read:user,user:email,repo"
         f"&redirect_uri={backend_url}/api/auth/callback"
     )
@@ -37,8 +37,10 @@ async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
         token_response = await client.post(
             GITHUB_TOKEN_URL,
             data={
-                "client_id": settings.GITHUB_CLIENT_ID,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
+                # Dashboard'a yapıştırılan değerlerde kalan boşluk/satır sonu/tırnak
+                # GitHub'da "incorrect_client_credentials" hatasına yol açıyor.
+                "client_id": settings.GITHUB_CLIENT_ID.strip().strip("\"'"),
+                "client_secret": settings.GITHUB_CLIENT_SECRET.strip().strip("\"'"),
                 "code": code,
                 "redirect_uri": f"{backend_url}/api/auth/callback",
             },
