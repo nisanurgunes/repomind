@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -143,6 +144,12 @@ const TAG_COLORS: Record<string, string> = {
 };
 
 export default function LandingPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (localStorage.getItem("devpulse_token")) router.replace("/dashboard");
+  }, [router]);
+
   return (
     <div className="min-h-screen bg-[#080b14] text-white">
 

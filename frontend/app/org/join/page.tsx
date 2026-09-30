@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
+import AppShell from "@/components/AppShell";
 
 function JoinOrgContent() {
   const router = useRouter();
@@ -31,7 +32,8 @@ function JoinOrgContent() {
   }, [token]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
+    <AppShell>
+    <div className="flex items-center justify-center px-4 py-24">
       <div className="w-full max-w-sm text-center">
         {status === "loading" && (
           <div className="space-y-3">
@@ -75,12 +77,13 @@ function JoinOrgContent() {
         )}
       </div>
     </div>
+    </AppShell>
   );
 }
 
 export default function JoinOrgPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center"><div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" /></div>}>
+    <Suspense fallback={<AppShell><div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" /></div></AppShell>}>
       <JoinOrgContent />
     </Suspense>
   );

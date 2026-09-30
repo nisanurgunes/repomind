@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import PublicShell from "@/components/PublicShell";
 
 interface ScoreCard {
   full_name: string;
@@ -88,39 +89,30 @@ export default function ScoreCardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400">Yükleniyor...</p>
-      </div>
+      <PublicShell>
+        <div className="flex items-center justify-center py-24">
+          <p className="text-gray-400">Yükleniyor...</p>
+        </div>
+      </PublicShell>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-500 dark:text-gray-400">{error}</p>
-        <button onClick={() => router.push("/")} className="text-sm text-indigo-600 hover:underline">
-          Ana sayfaya dön
-        </button>
-      </div>
+      <PublicShell>
+        <div className="flex flex-col items-center justify-center gap-4 py-24">
+          <p className="text-gray-500 dark:text-gray-400">{error}</p>
+          <button onClick={() => router.push("/")} className="text-sm text-indigo-600 hover:underline">
+            Ana sayfaya dön
+          </button>
+        </div>
+      </PublicShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-      {/* Navbar */}
-      <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
-        <button onClick={() => router.push("/")} className="text-lg font-bold text-gray-900 dark:text-white">
-          RepoMind
-        </button>
-        <button
-          onClick={() => router.push("/")}
-          className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
-        >
-          Sen de analiz et →
-        </button>
-      </nav>
-
-      <main className="flex-1 flex items-center justify-center px-4 py-12">
+    <PublicShell>
+      <div className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg">
 
           {/* Kart */}
@@ -197,10 +189,10 @@ export default function ScoreCardPage() {
           </div>
 
           <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-4">
-            RepoMind ile oluşturuldu · devpulse.app
+            RepoMind ile oluşturuldu
           </p>
         </div>
-      </main>
-    </div>
+      </div>
+    </PublicShell>
   );
 }

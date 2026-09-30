@@ -89,7 +89,7 @@ export default function OrgDashboardPage() {
     );
   }
 
-  if (!org) return null;
+  if (!org) return <AppShell>{null}</AppShell>;
 
   const canManage = org.my_role === "owner" || org.my_role === "admin";
 

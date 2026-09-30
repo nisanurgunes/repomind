@@ -30,6 +30,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  if (res.status === 401 && token && typeof window !== "undefined") {
+    // Oturum geçersiz/süresi dolmuş — landing sayfası giriş yapmış görünen
+    // kullanıcıyı dashboard'a geri attığı için token burada temizlenmeli.
+    localStorage.removeItem("devpulse_token");
+    localStorage.removeItem("devpulse_admin_token");
+    window.location.href = "/";
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Hata oluştu" }));
     if (res.status === 402 && err.error === "quota_exceeded") {

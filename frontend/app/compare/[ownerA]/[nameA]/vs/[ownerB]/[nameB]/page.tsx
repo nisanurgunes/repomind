@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import PublicShell from "@/components/PublicShell";
 
 interface ScoreCard {
   full_name: string;
@@ -78,18 +79,22 @@ export default function PublicComparePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Karşılaştırma yükleniyor...</p>
-      </div>
+      <PublicShell>
+        <div className="flex items-center justify-center py-24">
+          <p className="text-gray-400 animate-pulse">Karşılaştırma yükleniyor...</p>
+        </div>
+      </PublicShell>
     );
   }
 
   if (error || !cards) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-500">{error}</p>
-        <button onClick={() => router.push("/")} className="text-sm text-indigo-600 hover:underline">Ana sayfaya dön</button>
-      </div>
+      <PublicShell>
+        <div className="flex flex-col items-center justify-center gap-4 py-24">
+          <p className="text-gray-500">{error}</p>
+          <button onClick={() => router.push("/")} className="text-sm text-indigo-600 hover:underline">Ana sayfaya dön</button>
+        </div>
+      </PublicShell>
     );
   }
 
@@ -103,15 +108,8 @@ export default function PublicComparePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
-        <button onClick={() => router.push("/")} className="text-lg font-bold text-gray-900 dark:text-white">DevPulse</button>
-        <button onClick={() => router.push("/")} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
-          Sen de analiz et →
-        </button>
-      </nav>
-
-      <main className="max-w-2xl mx-auto px-6 py-10 space-y-4">
+    <PublicShell>
+      <div className="max-w-2xl mx-auto px-6 py-10 space-y-4">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Repo Karşılaştırma</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">DevPulse sağlık skoru karşılaştırması</p>
@@ -183,9 +181,9 @@ export default function PublicComparePage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-600">
-          DevPulse ile oluşturuldu · devpulse.app
+          RepoMind ile oluşturuldu
         </p>
-      </main>
-    </div>
+      </div>
+    </PublicShell>
   );
 }
