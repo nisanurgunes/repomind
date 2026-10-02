@@ -1,7 +1,7 @@
 """user id to uuid
 
 Revision ID: d4e7a1b2c3f0
-Revises: c3f1a2b4d5e6
+Revises: c9a1d2e3f4b5
 Create Date: 2026-06-13
 
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'd4e7a1b2c3f0'
-down_revision = 'c3f1a2b4d5e6'
+down_revision = 'c9a1d2e3f4b5'
 branch_labels = None
 depends_on = None
 
