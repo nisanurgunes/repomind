@@ -166,16 +166,12 @@ async def get_badge(owner: str, name: str, db: AsyncSession = Depends(get_db)):
     if score is None:
         score = "?"
         color = "#6b7280"
-        label_color = "#374151"
     elif score >= 80:
         color = "#16a34a"
-        label_color = "#15803d"
     elif score >= 60:
         color = "#ca8a04"
-        label_color = "#b45309"
     else:
         color = "#dc2626"
-        label_color = "#b91c1c"
 
     score_text = str(score)
     score_width = len(score_text) * 7 + 16
@@ -547,7 +543,7 @@ SADECE JSON formatında yanıt ver:
         return result
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Analiz tamamlanamadı. Lütfen tekrar deneyin.")
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Analiz sırasında bir hata oluştu. Lütfen tekrar deneyin.")
 
 

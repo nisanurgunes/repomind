@@ -7,6 +7,7 @@ Create Date: 2026-06-09
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision = 'c3f1a2b4d5e6'
 down_revision = 'b2e4f8c1d9a0'
@@ -41,7 +42,14 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('org_id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('role', orgrole, nullable=False, server_default='member'),
+        # create_type=False: tip yukarıda açıkça oluşturuldu; tablo oluşturulurken
+        # ikinci kez CREATE TYPE çalışıp "already exists" hatası vermesin
+        sa.Column(
+            'role',
+            postgresql.ENUM('owner', 'admin', 'member', name='orgrole', create_type=False),
+            nullable=False,
+            server_default='member',
+        ),
         sa.Column('joined_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(['org_id'], ['organizations.id']),
         sa.ForeignKeyConstraint(['user_id'], ['users.id']),

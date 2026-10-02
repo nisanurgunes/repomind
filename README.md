@@ -95,6 +95,35 @@ npm run dev
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
+## Tests & CI
+
+Every pull request (and every push to `main` / `staging`) runs the GitHub Actions
+workflow in `.github/workflows/ci.yml`:
+
+| Job | Checks |
+|-----|--------|
+| Backend | `ruff` lint → `alembic upgrade head` on an empty Postgres → `pytest` (unit + API tests) |
+| Frontend | `eslint` → `tsc --noEmit` → `next build` |
+
+Run the same checks locally:
+
+```bash
+# Backend
+cd backend
+pip install -r requirements.txt -r requirements-dev.txt
+ruff check .
+docker compose -f docker-compose.test.yml up -d   # throwaway Postgres on 127.0.0.1:5433
+TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5433/repomind_test pytest
+
+# Frontend
+cd frontend
+npm run lint:ci && npx tsc --noEmit && npm run build
+```
+
+The API tests empty the tables before each test, so they only run against the
+database in `TEST_DATABASE_URL` and refuse any host that is not local. Without
+`TEST_DATABASE_URL` the database tests are skipped and only the unit tests run.
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
