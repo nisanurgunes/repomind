@@ -88,8 +88,6 @@ async def db(migrated_db):
 async def client(db):
     from app.main import app
 
-    # ASGITransport lifespan çalıştırmaz: startup'taki create_all devreye girmez,
-    # şema migration'lardan gelir.
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
