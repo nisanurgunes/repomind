@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, update
 from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
-from app.models.repo import Notification, Watchlist, Repo, RepoSnapshot, NotificationType
+from app.models.repo import Notification, Watchlist, Repo, NotificationType
 from app.services.github import GithubService
 from datetime import datetime, timezone, timedelta
 
@@ -72,15 +72,6 @@ async def check_notifications(
     new_count = 0
     for wl, repo in items:
         try:
-            # Son snapshot'ı al
-            snap_result = await db.execute(
-                select(RepoSnapshot)
-                .where(RepoSnapshot.repo_id == repo.id)
-                .order_by(desc(RepoSnapshot.date))
-                .limit(1)
-            )
-            last_snap = snap_result.scalar_one_or_none()
-
             # Son 24 saatteki commitleri çek
             commits = await github.get_commits(repo.owner, repo.name, days=1)
             if commits:

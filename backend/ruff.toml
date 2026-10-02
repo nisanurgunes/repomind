@@ -1,0 +1,13 @@
+target-version = "py311"
+
+[lint]
+# Şimdilik yalnızca gerçek hata sınıfları: sözdizimi hataları (E9) ve pyflakes (F:
+# tanımsız isim, kullanılmayan import/değişken). Stil kuralları (E7xx vb.) mevcut
+# kodda çok ihlal ürettiği için kademeli olarak açılacak.
+select = ["E9", "F"]
+
+[lint.per-file-ignores]
+# SQLAlchemy ilişkileri diğer modülün modellerini string olarak referanslar
+"app/models/*.py" = ["F821"]
+# Modeller yalnızca Base.metadata'ya kaydolsun diye import ediliyor
+"alembic/env.py" = ["F401"]

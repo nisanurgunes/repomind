@@ -27,7 +27,7 @@ def refresh_watchlist_repos():
 
 
 async def _refresh_all():
-    from sqlalchemy import select, distinct
+    from sqlalchemy import select
     from app.core.database import AsyncSessionLocal
     from app.models.repo import Repo, RepoSnapshot, Watchlist
     from app.services.github import GithubService
